@@ -45,22 +45,21 @@ jobs:
         run: |
           python upvote_comment.py
 
-      # 6. Stage changes first, then pull with rebase, and finally commit/push
-      - name: Commit and Push Updated History State
-        if: always() # Ensures state changes are captured even if preceding setup tasks reported issues
+      # 6. Commit and Push Any Changes (Matching the exact sequence of the reference file)
+      - name: Commit and Push Any Changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Stage tracking changes (like commented.json) first so Git allows the rebase pull
+          # Pull down remote updates first to prevent out-of-sync conflicts
+          git pull origin main
+          
+          # Stage all untracked and modified tracking data changes (like commented.json)
           git add -A
           
-          # Safely pull remote changes on top of our staged tracking data
-          git pull origin main --rebase
-          
-          # Conditionally commit and push only if modifications to the tracking state exist
+          # Check if there are any staged modifications before performing the commit step
           if git diff --staged --quiet; then
-            echo "No state modifications or tracking data updates detected."
+            echo "No new changes or deleted images to commit."
           else
             git commit -m "chore: update automation history state [skip ci]"
             git push origin main
