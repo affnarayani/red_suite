@@ -45,18 +45,18 @@ jobs:
         run: |
           python upvote_comment.py
 
-      # 6. Pull latest remote changes, stage updated state JSON, commit, and push back to main
+      # 6. Stage changes first, then pull with rebase, and finally commit/push
       - name: Commit and Push Updated History State
         if: always() # Ensures state changes are captured even if preceding setup tasks reported issues
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Pull latest state to avoid potential push conflicts
-          git pull origin main --rebase
-          
-          # Stage tracking changes explicitly targeting persistence files like commented.json
+          # Stage tracking changes (like commented.json) first so Git allows the rebase pull
           git add -A
+          
+          # Safely pull remote changes on top of our staged tracking data
+          git pull origin main --rebase
           
           # Conditionally commit and push only if modifications to the tracking state exist
           if git diff --staged --quiet; then
