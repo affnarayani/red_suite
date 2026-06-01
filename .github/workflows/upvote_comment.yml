@@ -1,0 +1,67 @@
+name: Upvote and Comment
+
+on:
+  schedule:
+    - cron: '0 */3 * * *' # Scheduled to run every 3 hours
+  workflow_dispatch: # Allows manual triggering from the GitHub UI
+
+permissions:
+  contents: write # Grants permission to modify and push json state changes back to the repository
+
+jobs:
+  run-automation:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Fetch the latest code and state from the repository
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      # 2. Configure Python Environment using reference version
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # 3. Install required packages from requirements.txt
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4. Set up Playwright Chromium browser and its system binaries
+      - name: Install Playwright and System Dependencies
+        run: |
+          python -m playwright install --with-deps chromium
+
+      # 5. Run the core automation script with injected environment secrets
+      - name: Run Reddit Upvote and Comment Script
+        env:
+          DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python upvote_comment.py
+
+      # 6. Pull latest remote changes, stage updated state JSON, commit, and push back to main
+      - name: Commit and Push Updated History State
+        if: always() # Ensures state changes are captured even if preceding setup tasks reported issues
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Pull latest state to avoid potential push conflicts
+          git pull origin main --rebase
+          
+          # Stage tracking changes explicitly targeting persistence files like commented.json
+          git add -A
+          
+          # Conditionally commit and push only if modifications to the tracking state exist
+          if git diff --staged --quiet; then
+            echo "No state modifications or tracking data updates detected."
+          else
+            git commit -m "chore: update automation history state [skip ci]"
+            git push origin main
+          fi
