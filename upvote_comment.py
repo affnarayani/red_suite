@@ -26,7 +26,7 @@ from playwright_stealth import Stealth
 HEADLESS = True
 
 REDDIT_COOKIES_FILE = "reddit_cookies.json.encrypted"
-SUBREDDITS_FILE = "subreddits.txt"
+SUBREDDITS_FILE = "comment_subreddits.txt"
 COMMENTED_JSON_FILE = "commented.json"
 
 PBKDF2_ITERATIONS = 200_000
