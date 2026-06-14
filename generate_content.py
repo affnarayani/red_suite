@@ -137,6 +137,28 @@ def get_last_topic() -> str:
     return selected_topic
 
 
+def get_subreddit_for_topic(topic: str) -> str:
+    print(f"[STEP] Searching exact subreddit for topic: '{topic}'...", flush=True)
+    mapping_file = Path("subreddit_mapping.json")
+    
+    if not mapping_file.exists():
+        raise FileNotFoundError("❌ 'subreddit_mapping.json' file nahi mila.")
+        
+    with mapping_file.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+        
+    for item in data.get("topics", []):
+        if item.get("topic", "").strip() == topic.strip():
+            subreddit = item.get("subreddit")
+            if subreddit:
+                print(f"[OK] Found exact subreddit: '{subreddit}'", flush=True)
+                return subreddit
+            else:
+                raise ValueError(f"❌ '{topic}' ke liye subreddit key khali (empty) hai.")
+                
+    raise ValueError(f"❌ Topic '{topic}' ka mapping 'subreddit_mapping.json' mein nahi mila.")
+
+
 def remove_last_topic_from_file():
     print("[STEP] Removing the processed topic from topics.txt...", flush=True)
     topics_file = Path("topics.txt")
@@ -153,23 +175,6 @@ def remove_last_topic_from_file():
         for line in lines:
             f.write(f"{line}\n")
     print("[OK] Topic successfully removed from topics.txt", flush=True)
-
-
-def get_random_promo_link() -> str:
-    print("[STEP] Reading links.txt...", flush=True)
-    links_file = Path("links.txt")
-    if not links_file.exists():
-        raise FileNotFoundError("❌ 'links.txt' file nahi mila.")
-    
-    with links_file.open("r", encoding="utf-8") as f:
-        links = [line.strip() for line in f if line.strip()]
-        
-    if not links:
-        raise ValueError("❌ 'links.txt' khali hai. Promotion ke liye koi link nahi mila.")
-    
-    selected_link = random.choice(links)
-    print(f"[OK] Randomly selected promo link: '{selected_link}'", flush=True)
-    return selected_link
 
 
 # =========================
@@ -193,12 +198,11 @@ def run():
         print(f"[ERROR] status.json parse nahi ho paya: {e}. Exiting...", flush=True)
         sys.exit(0)
 
-    # Dono false hone par hi aage badhega, nahi toh exit (0) ho jayega
-    if status_data.get("generate_content") is not False or status_data.get("generate_image") is not False:
-        print("[INFO] Condition match nahi hui (Dono false nahi hain). Exiting safely...", flush=True)
+    if status_data.get("content_generated") is True:
+        print("Content already generated!", flush=True)
         sys.exit(0)
         
-    print("[OK] Status check passed. Proceeding...", flush=True)
+    print("[OK] Status check passed (content_generated is False). Proceeding...", flush=True)
 
     # File init/clear at the beginning
     article_file = Path("reddit_post.json")
@@ -207,10 +211,10 @@ def run():
         f.write("")
     print("[OK] 'reddit_post.json' cleared/initialized", flush=True)
 
-    # Get topic and promo link
+    # Get topic and dynamic subreddit
     try:
         topic = get_last_topic()
-        promo_link = get_random_promo_link()
+        subreddit_name = get_subreddit_for_topic(topic)
     except Exception as e:
         print(f"[ERROR] Configurations files read karne me dikkat aayi: {e}", flush=True)
         sys.exit(1)
@@ -300,7 +304,7 @@ def run():
             f"Do not print any JSON outside of a code block. "
             f"Do not add any text, explanation, or markdown before or after the code block.\n\n"
 
-            f"Write a Reddit post for r/selfimprovement or r/getdisciplined on the topic: '{topic}'.\n\n"
+            f"Write a Reddit post for {subreddit_name} on the topic: '{topic}'.\n\n"
 
             f"CRITICAL RULES FOR REDDIT:\n"
             f"1. NO promotional links, no CTAs, no product mentions anywhere in the post.\n"
@@ -400,26 +404,32 @@ def run():
                 
                 parsed_json = json.loads(json_content.strip())
                 
-                # Title sync check
+                # Title ko topic se sync karna
                 parsed_json["title"] = topic
                 
-                print("[STEP] Saving to reddit_post.json...", flush=True)
+                # NAYA CHANGE: Naya dictionary bana kar 'subreddit' ko 'title' se upar push kiya gaya hai
+                final_ordered_json = {
+                    "subreddit": subreddit_name,
+                    "title": parsed_json["title"],
+                    "body": parsed_json.get("body", "")
+                }
+                
+                print("[STEP] Saving ordered dictionary to reddit_post.json...", flush=True)
                 with article_file.open("w", encoding="utf-8") as f:
-                    json.dump(parsed_json, f, indent=4, ensure_ascii=False)
-                print("[OK] Article successfully saved with embedded promo link to reddit_post.json", flush=True)
+                    json.dump(final_ordered_json, f, indent=4, ensure_ascii=False)
+                print("[OK] Article successfully saved to reddit_post.json with subreddit key on top", flush=True)
                 
                 # Success validation achieved: Safe to remove topic now
                 remove_last_topic_from_file()
 
-                # =========================
+                # =====================================
                 # UPDATE STATUS
-                # =========================
+                # =====================================
                 print("[STEP] Updating status.json...", flush=True)
-                status_data["generate_content"] = True
-                status_data["generate_image"] = False  # Yeh already false hai, par explicit rakh rahe hain
+                status_data["content_generated"] = True
                 with status_file.open("w", encoding="utf-8") as f:
                     json.dump(status_data, f, indent=4, ensure_ascii=False)
-                print("[OK] status.json successfully updated (generate_content=True)", flush=True)
+                print("[OK] status.json successfully updated (content_generated=True)", flush=True)
                 
             except json.JSONDecodeError as je:
                 print(f"[ERROR] Content JSON parse karne me fail hua: {je}. Exiting script...", flush=True)
