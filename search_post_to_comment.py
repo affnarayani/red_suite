@@ -27,6 +27,7 @@ HEADLESS = True
 REDDIT_COOKIES_FILE = "reddit_cookies.json.encrypted"
 SUBREDDITS_FILE = "comment_subreddits.txt"
 STATUS_JSON_FILE = "status.json"
+COMMENTED_JSON_FILE = "commented.json"
 
 PBKDF2_ITERATIONS = 200_000
 
@@ -238,6 +239,28 @@ def run():
         clean_post_url = clean_url_match.group(1) if clean_url_match else full_url
 
         print(f"[NAVIGATED URL]: {clean_post_url}", flush=True)
+
+        # >>>>>>> UPDATE HUA BLOCK (SAFE MATCHING) <<<<<<<
+        commented_path = Path(COMMENTED_JSON_FILE)
+        if commented_path.exists():
+            try:
+                with commented_path.open("r", encoding="utf-8") as cf:
+                    commented_data = json.load(cf)
+                
+                if isinstance(commented_data, list):
+                    # Dono side ke extracted URL aur saved URLs ka trailing slash (/) hata kar check karein
+                    current_url_clean = clean_post_url.rstrip('/')
+                    commented_urls_clean = [url.rstrip('/') for url in commented_data if isinstance(url, str)]
+                    
+                    if current_url_clean in commented_urls_clean:
+                        print(f"[CLEAN EXIT] URL already exists in commented.json (Slash Matched). Skipping. Exiting 1.", flush=True)
+                        browser.close()
+                        pw_cm.__enter__().__exit__(None, None, None)
+                        sys.exit(1)
+            except Exception as e:
+                print(f"[WARNING] Reading commented.json failed: {e}", flush=True)
+        # >>>>>>> BLOCK END <<<<<<<
+        
         print("[PROCEED] Extracting text body...", flush=True)
 
         # =========================
