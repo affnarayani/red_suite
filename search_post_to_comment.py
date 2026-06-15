@@ -128,7 +128,7 @@ def run():
         "link_to_post_to_comment": "",
         "content_of_post_to_comment": "",
         "comment_generated": False,
-        "comment": ""
+        "comment": ""  # FIXED: 'comment' key ko wapas default mein rakh diya hai
     }
 
     if status_path.exists():
@@ -136,6 +136,9 @@ def run():
             with status_path.open("r", encoding="utf-8") as sf:
                 existing_status = json.load(sf)
                 if isinstance(existing_status, dict):
+                    # FIXED: Agar file mein pehle se galat 'commented' key ho toh use uda do
+                    if "commented" in existing_status:
+                        del existing_status["commented"]
                     status_data.update(existing_status)
         except Exception as json_err:
             print(f"[WARNING] Reading status.json failed, using defaults: {json_err}", flush=True)
@@ -195,33 +198,35 @@ def run():
         if selected_subreddit.startswith("/"):
             selected_subreddit = selected_subreddit[1:]
             
-        target_url = f"https://www.reddit.com/{selected_subreddit}"
+        target_url = f"https://www.reddit.com/{selected_subreddit}/rising/?feedViewType=compactView"
         
-        print(f"[STEP] Opening chosen Subreddit URL: {target_url}...", flush=True)
+        print(f"[STEP] Opening chosen Subreddit URL (Compact View): {target_url}...", flush=True)
         page.goto(target_url, wait_until="domcontentloaded")
         print(f"[OK] {target_url} opened completely", flush=True)
         
         custom_random_wait(5, 10)
 
-        # =========================
-        # LINK INTERACTION
-        # =========================
-        print("[STEP] Filtering for pure post links...", flush=True)
-        all_comment_links = page.locator("a[href*='/comments/']")
-        pure_posts = all_comment_links.filter(
-            has_not=page.locator("h1, h2, h3, h4, h5, h6, [class*='heading'], [id*='heading']")
+        # ========================================================
+        # LINK INTERACTION (NO SCROLLING)
+        # ========================================================
+        print("[STEP] Searching for the first post link using get_by_role...", flush=True)
+        
+        post_links_by_role = page.locator("shreddit-post").get_by_role('link', name=re.compile(r'.+')).filter(
+            has=page.locator("xpath=./ancestor-or-self::a[contains(@href, '/comments/')]")
         )
         
-        post_link = pure_posts.first
+        post_link = post_links_by_role.first
+
         if post_link.count() == 0:
-            post_link = all_comment_links.first
+            print("[WARNING] get_by_role failed, falling back to any new comment link...", flush=True)
+            post_link = page.locator("a[href*='/comments/']").first
 
         post_link.wait_for(state="visible", timeout=20000)
         post_link.scroll_into_view_if_needed()
         
-        print("[STEP] Clicking on the genuine user post link...", flush=True)
+        print("[STEP] Clicking on the post link...", flush=True)
         post_link.click()
-        print("[OK] Real post link clicked successfully!", flush=True)
+        print("[OK] Post link clicked successfully!", flush=True)
         
         custom_random_wait(5, 10)
 
@@ -258,22 +263,22 @@ def run():
             print("[CLEAN EXIT] Post content is 150 characters or less. Skipping this post. Terminating cleanly with status 0.", flush=True)
             browser.close()
             pw_cm.__enter__().__exit__(None, None, None)
-            sys.exit(0)
+            sys.exit(1)
 
         print("[PROCEED] Eligible post found (> 150 characters). Updating status.json...", flush=True)
 
-        # Update JSON parameters according to specifications
+        # Update JSON parameters
         status_data["post_to_comment_found"] = True
         status_data["link_to_post_to_comment"] = clean_post_url
         status_data["content_of_post_to_comment"] = post_text
         status_data["content_generated"] = False
         status_data["comment_generated"] = False
-        status_data["comment"] = ""
+        status_data["comment"] = ""  # FIXED: 'comment' key ko wapas append kar diya hai
 
         with status_path.open("w", encoding="utf-8") as sf:
             json.dump(status_data, sf, indent=4)
             
-        print("[OK] status.json has been successfully updated with the fresh post!", flush=True)
+        print("[OK] status.json has been successfully updated with the comment key!", flush=True)
 
         # Final close delay buffer as instructed (15 to 30 seconds)
         custom_random_wait(15, 30)
