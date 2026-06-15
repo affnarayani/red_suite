@@ -63,6 +63,7 @@ jobs:
         [ -f reddit_post.json ] && git add reddit_post.json
         [ -f topics.txt ] && git add topics.txt
         [ -f status.json ] && git add status.json
+        [ -f subreddit_mapping.json ] && git add subreddit_mapping.json
         
         if git diff --staged --quiet; then
           echo "[INFO] No changes detected. Skipping push."
