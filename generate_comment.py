@@ -246,27 +246,92 @@ def run():
             f"Read the following Reddit post content carefully:\n"
             f"\"\"\"\n{post_content}\n\"\"\"\n\n"
 
-            f"Your task is to write a highly engaging, attention-grabbing, and upvote-worthy Reddit comment responding to this post.\n\n"
+            f"Your task is to write a thoughtful, natural Reddit comment that adds value to the discussion.\n\n"
 
-            f"CRITICAL RULES FOR THE COMMENT:\n"
-            f"1. Connect deeply with the author's feelings. Give them the exact validation, encouragement, and supportive response they want to hear based on their breakthrough.\n"
-            f"2. Tone must sound 100% human, casual, conversational, and authentic. Talk like a supportive friend who also happens to be an expert in mindset/growth (an 'expert friend').\n"
-            f"3. Strictly AVOID sounding robotic, overly technical, or medical. Do not use corporate fluff or clinical psychology jargon.\n"
-            f"4. SPECIFICITY RULE: The comment MUST reference at least ONE specific detail "
-            f"from the post itself — a concrete moment, result, or decision the author mentioned. "
-            f"Generic observations that could apply to any post are not allowed.\n"
-            f"5. CHARACTER LIMIT: The total length of the comment text must be strictly between 300 and 500 characters long (including spaces). No shorter than 300, no longer than 500.\n"
-            f"6. NO NEWLINES: The final comment body text MUST NOT contain any newline characters (\\n), line breaks, or paragraphs. It must be written entirely as a single continuous line of text.\n"
-            f"7. END STRONG: Do not end with phrases like 'huge respect', 'hope this helps', "
-            f"'thanks for sharing', or 'hope more people see this'. "
-            f"End with either a genuine personal reaction OR a natural curiosity-driven question "
-            f"that directly relates to something specific in the post.\n"
-            f"8. Do NOT use any markdown styling like asterisks (*) for bolding or italics.\n"
-            f"9. Do NOT include greetings, intro phrases, or post-text outside the JSON block.\n\n"
+            f"Before writing the comment, silently analyze the post and determine:\n"
+            f"- Is the author asking for advice?\n"
+            f"- Sharing a success or breakthrough?\n"
+            f"- Telling a personal story?\n"
+            f"- Expressing an opinion?\n"
+            f"- Venting or expressing frustration?\n"
+            f"- Starting a discussion?\n\n"
+
+            f"Also identify the single most interesting, discussion-worthy, or important idea in the post and focus primarily on that.\n"
+            f"Do not try to respond equally to every point.\n\n"
+
+            f"CRITICAL RULES FOR THE COMMENT:\n\n"
+
+            f"1. Match the emotional tone and intent of the post.\n"
+            f"   - If the author is sharing a success, breakthrough, lesson, or positive change, respond with validation, encouragement, and thoughtful reflection.\n"
+            f"   - If the author is asking a question or seeking advice, contribute a useful insight, personal experience, or perspective that directly helps answer the question.\n"
+            f"   - If the author is venting or struggling, respond with empathy and understanding before offering perspective.\n"
+            f"   - Do not default to encouragement when it does not fit the post.\n\n"
+
+            f"2. Sound 100% human, casual, conversational, and authentic.\n"
+            f"   Write like a thoughtful Reddit user speaking from genuine experience.\n"
+            f"   Do not sound like a coach, therapist, motivational speaker, marketer, content creator, or AI assistant.\n\n"
+
+            f"3. Strictly avoid robotic, overly polished, corporate, motivational, clinical, or self-help-book language.\n\n"
+
+            f"4. SPECIFICITY RULE:\n"
+            f"   The comment must directly reference and build upon a specific idea, example, decision, result, observation, or question from the post.\n"
+            f"   The comment should feel impossible to paste under a different post without obvious mismatch.\n\n"
+
+            f"5. TARGET LENGTH:\n"
+            f"   Target 150-450 characters including spaces.\n"
+            f"   Use only as many words as needed.\n"
+            f"   Never add filler just to reach a length target.\n\n"
+
+            f"6. NO NEWLINES:\n"
+            f"   The final comment text must be a single continuous line.\n"
+            f"   No newline characters, paragraphs, or line breaks are allowed.\n\n"
+
+            f"7. END NATURALLY:\n"
+            f"   The comment may end with:\n"
+            f"   - A thoughtful question\n"
+            f"   - A personal observation\n"
+            f"   - A concise insight\n"
+            f"   - A genuine reaction\n"
+            f"   Do not force a question if the comment already feels complete.\n\n"
+
+            f"8. Do not use markdown formatting such as *, **, _, bullet points, numbered lists, emojis, hashtags, or decorative characters.\n\n"
+
+            f"9. Do not include greetings, introductions, disclaimers, or any text outside the JSON block.\n\n"
+
+            f"10. Avoid common AI-sounding or overused Reddit phrases such as:\n"
+            f"    'you've cracked the code'\n"
+            f"    'you're onto something'\n"
+            f"    'this resonates'\n"
+            f"    '100% agree'\n"
+            f"    'this is the way'\n"
+            f"    'more people need to hear this'\n"
+            f"    'thanks for sharing'\n"
+            f"    'hope this helps'\n"
+            f"    'huge respect'\n"
+            f"    'keep it up'\n"
+            f"    or similar generic filler.\n\n"
+
+            f"11. Whenever natural, move the discussion forward by adding a useful observation, personal experience, alternative perspective, or follow-up thought rather than simply agreeing.\n\n"
+
+            f"12. Valuable discussion is preferred over automatic validation.\n"
+            f"    If appropriate, respectfully challenge, refine, or expand on the author's idea instead of automatically agreeing.\n\n"
+
+            f"13. Vary the structure naturally.\n"
+            f"    Do not repeatedly use the same patterns such as:\n"
+            f"    - Starting with 'What helped me was...'\n"
+            f"    - Starting with agreement\n"
+            f"    - Ending every comment with a question\n"
+            f"    - Following the same advice → explanation → question structure\n"
+            f"    Mix observations, experiences, realizations, questions, and alternative viewpoints naturally.\n\n"
+
+            f"14. Write as if you are a real Reddit user contributing to the discussion, not someone trying to maximize engagement.\n"
+            f"    The comment should feel useful, authentic, spontaneous, and believable.\n\n"
+
+            f"15. Prioritize comments that earn replies and upvotes because they add value, insight, perspective, relatability, or useful experience—not because they are excessively positive.\n\n"
 
             f"OUTPUT FORMAT — strictly inside a single JSON code block:\n"
             f"{{\n"
-            f'  "comment": "Your direct, single-line conversational comment goes here"\n'
+            f'  "comment": "Your direct single-line Reddit comment here"\n'
             f"}}\n"
         )
 
