@@ -17,11 +17,12 @@ jobs:
 
     steps:
       # 1. Fetch the latest code and state from the repository
+      # Full history fetch karna rebase conflicts se bachata hai
       - name: Checkout Repository
         uses: actions/checkout@v5
         with:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-          fetch-depth: 0 # Full history fetch karna rebase conflicts se bachata hai
+          fetch-depth: 0 
 
       # 2. Configure Python Environment using reference version
       - name: Set up Python
@@ -57,8 +58,14 @@ jobs:
           
           BRANCH_NAME="${GITHUB_REF_NAME:-main}"
           
-          # Pull down remote updates first to prevent out-of-sync conflicts
+          # 1. Jo local changes python script ne kiye hain, unhe temporarily stash (hide) karo
+          git stash
+          
+          # 2. Pull down remote updates safely without conflict
           git pull origin "$BRANCH_NAME" --rebase
+          
+          # 3. Stashed changes ko wapas apply karo (agar koi change nahi tha toh error na aaye isliye || true)
+          git stash pop || true
           
           # Only stage the intended files
           [ -f status.json ] && git add status.json
