@@ -2,7 +2,7 @@ name: Retry Workflows
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Run every hour
+    - cron: '*/30 * * * *'  # Run every hour
   workflow_dispatch:  # Allow manual triggering
 
 permissions:
