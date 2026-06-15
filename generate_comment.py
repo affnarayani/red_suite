@@ -329,6 +329,10 @@ def run():
 
             f"15. Prioritize comments that earn replies and upvotes because they add value, insight, perspective, relatability, or useful experience—not because they are excessively positive.\n\n"
 
+            f"16. Prefer adding a new observation, distinction, implication, or perspective rather than simply rephrasing the author's point.\n"
+            f"    Avoid comments that mainly summarize, paraphrase, or restate what was already said in the post.\n"
+            f"    Whenever possible, contribute a thought that expands, refines, challenges, or deepens the discussion.\n\n"
+
             f"OUTPUT FORMAT — strictly inside a single JSON code block:\n"
             f"{{\n"
             f'  "comment": "Your direct single-line Reddit comment here"\n'
