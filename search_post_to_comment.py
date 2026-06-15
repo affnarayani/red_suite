@@ -128,8 +128,7 @@ def run():
         "link_to_post_to_comment": "",
         "content_of_post_to_comment": "",
         "comment_generated": False,
-        "comment": "",
-        "commented": False
+        "comment": ""
     }
 
     if status_path.exists():
@@ -270,7 +269,6 @@ def run():
         status_data["content_generated"] = False
         status_data["comment_generated"] = False
         status_data["comment"] = ""
-        status_data["commented"] = False
 
         with status_path.open("w", encoding="utf-8") as sf:
             json.dump(status_data, sf, indent=4)
