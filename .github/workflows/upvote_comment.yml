@@ -1,9 +1,11 @@
 name: Upvote and Comment
 
 on:
-  schedule:
-    - cron: '0 */3 * * *' # Scheduled to run every 3 hours
-  workflow_dispatch: # Allows manual triggering from the GitHub UI
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Generate Comment"] # Jab 'Generate Comment' workflow khatam hoga tab trigger hoga
+    types:
+      - completed
 
 permissions:
   contents: write # Grants permission to modify and push json state changes back to the repository
@@ -11,6 +13,7 @@ permissions:
 jobs:
   run-automation:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       # 1. Fetch the latest code and state from the repository
@@ -18,6 +21,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0 # Full history fetch karna rebase conflicts se bachata hai
 
       # 2. Configure Python Environment using reference version
       - name: Set up Python
@@ -30,37 +34,40 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install playwright playwright-stealth cryptography python-dotenv; fi
 
       # 4. Set up Playwright Chromium browser and its system binaries
       - name: Install Playwright and System Dependencies
         run: |
           python -m playwright install --with-deps chromium
 
-      # 5. Run the core automation script with injected environment secrets
+      # 5. Run the core automation script (Clean Headless Execution)
       - name: Run Reddit Upvote and Comment Script
         env:
-          DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }} # HF_TOKEN removed as requested
         run: |
           python upvote_comment.py
 
-      # 6. Commit and Push Any Changes (Matching the exact sequence of the reference file)
+      # 6. Commit and Push Any Changes (Safe State Sync)
       - name: Commit and Push Any Changes
+        if: always() # Hamesha chalega taaki agar partial run bhi hua ho toh state save ho jaye
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Pull down remote updates first to prevent out-of-sync conflicts
-          git pull origin main
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
           
-          # Stage all untracked and modified tracking data changes (like commented.json)
-          git add -A
+          # Pull down remote updates first to prevent out-of-sync conflicts
+          git pull origin "$BRANCH_NAME" --rebase
+          
+          # Only stage the intended files
+          [ -f status.json ] && git add status.json
+          [ -f commented.json ] && git add commented.json
           
           # Check if there are any staged modifications before performing the commit step
           if git diff --staged --quiet; then
-            echo "No new changes or deleted images to commit."
+            echo "No new changes to commit."
           else
             git commit -m "chore: update automation history state [skip ci]"
-            git push origin main
+            git push origin "$BRANCH_NAME"
           fi

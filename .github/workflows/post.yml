@@ -1,0 +1,94 @@
+name: Post
+
+on:
+  workflow_dispatch: # Manual trigger ke liye
+  workflow_run:
+    workflows: ["Generate Content"] # Jab 'Generate Image' workflow khatam hoga tab trigger hoga
+    types:
+      - completed
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    # Sirf tabhi chalega jab manual ho YA pichla workflow successfully khatam hua ho
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    # CRITICAL FIX: GitHub Actions ko push karne ki permission dena
+    permissions:
+      contents: write
+
+    steps:
+      # 1. Repository code checkout karna
+      - name: Checkout repository code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Full history fetch karega safe sync ke liye
+
+      # 2. Python Environment setup karna
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # 3. Git Author Identity configure karna (Sirf ek baar kaafi hai)
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      # 4. Pull Latest Changes (Kyunki pichle workflow ne shayad kuch change kiya ho)
+      - name: Pull Latest Changes (Maintain Persistence)
+        run: |
+          # Safe fallback agar GITHUB_REF_NAME empty ho (workflow_run ke cases mein)
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+          git pull origin "$BRANCH_NAME" --rebase
+
+      # 5. Python Packages install karna
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright playwright-stealth python-dotenv cryptography
+
+      # 6. Playwright Chromium install karna
+      - name: Install Playwright Chromium and system dependencies
+        run: |
+          playwright install chromium --with-deps
+
+      # 7. Script ko run karna
+      - name: Execute Automation Script
+        env:
+          DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }}
+        run: |
+          python post.py
+
+      # 8. Agar script fail hoti hai, toh error screenshot ko upload karna
+      - name: Upload Error Screenshot if script fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reddit-post-error-screenshot
+          path: error_screenshot.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # 9. Status aur Post data wapas commit karna
+      - name: Commit and Push updated files
+        if: always() # Hamesha check karein taaki agar partial state change ho toh save ho jaye
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+          
+          # Sirf tabhi add karein agar files exist karti hon
+          [ -f reddit_post.json ] && git add reddit_post.json
+          [ -f status.json ] && git add status.json
+          
+          if git diff --staged --quiet; then
+            echo "[INFO] No changes detected in status.json or reddit_post.json. Skipping push."
+          else
+            echo "[OK] Status changed. Committing and pushing updates..."
+            git commit -m "chore: mark article as posted [skip ci]"
+            git push origin "$BRANCH_NAME"
+          fi

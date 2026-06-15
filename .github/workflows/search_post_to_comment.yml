@@ -1,0 +1,62 @@
+name: Search Post to Comment
+
+on:
+  schedule:
+    - cron: '0 */3 * * *' # Har 3 ghante mein ek baar automatically chalega
+  workflow_dispatch:
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  search-automation:
+    runs-on: ubuntu-latest
+    
+    # CRITICAL: Permission granted for committing/pushing changes back to repo
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0 # Full history fetch karega safe dynamic push ke liye
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.11'
+
+    - name: Configure Git
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Pull Latest Changes (Maintain Persistence)
+      run: |
+        git pull origin ${GITHUB_REF_NAME} --rebase
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install playwright playwright-stealth cryptography python-dotenv
+        playwright install chromium --with-deps
+
+    - name: Run Search Script
+      env:
+        DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }} # Ensure this is added in GitHub Secrets
+      run: |
+        python search_post_to_comment.py
+
+    - name: Commit and Push Status Changes
+      if: always() # Hamesha check karega taaki agar eligible post mili ho toh save ho jaye
+      run: |
+        # Script sirf status.json ko modify karti hai ya create karti hai
+        [ -f status.json ] && git add status.json
+        
+        if git diff --staged --quiet; then
+          echo "[INFO] No changes detected in status.json. Skipping push."
+        else
+          echo "[OK] Eligible post found and recorded. Committing status update..."
+          git commit -m "Automated: Fresh target post extracted [skip ci]"
+          git push origin ${GITHUB_REF_NAME}
+        fi

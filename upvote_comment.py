@@ -22,7 +22,7 @@ from playwright_stealth import Stealth
 # =========================
 # CONFIG
 # =========================
-HEADLESS = False
+HEADLESS = True
 
 REDDIT_COOKIES_FILE = "reddit_cookies.json.encrypted"
 STATUS_JSON_FILE = "status.json"
