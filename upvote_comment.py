@@ -203,9 +203,19 @@ def run():
                 print(f"[WARNING] Reading history json failed: {j_err}", flush=True)
 
         if clean_post_url in existing_urls:
-            print(f"[CLEAN EXIT] URL already commented in history: {clean_post_url}. Exiting.", flush=True)
+            print(f"[CLEAN EXIT] URL already commented in history: {clean_post_url}. Resetting status and exiting.", flush=True)
+            
+            # 1. status.json को रीसेट करें
+            status_data["post_to_comment_found"] = False
+            status_data["comment_generated"] = False
+            status_data["link_to_post_to_comment"] = ""
+            status_data["content_of_post_to_comment"] = ""
+            status_data["comment"] = ""
+            with status_path.open("w", encoding="utf-8") as sf:
+                json.dump(status_data, sf, indent=4)
+                
+            # 2. सिर्फ ब्राउज़र बंद करें, बाकी काम नीचे वाला finally ब्लॉक अपने आप संभाल लेगा
             browser.close()
-            pw_cm.__enter__().__exit__(None, None, None)
             sys.exit(0)
 
         # =========================
