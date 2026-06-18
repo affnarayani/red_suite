@@ -256,7 +256,8 @@ def run():
             f"- Venting or expressing frustration?\n"
             f"- Starting a discussion?\n\n"
 
-            f"Also identify the single most interesting, discussion-worthy, or important idea in the post and focus primarily on that.\n"
+            f"Identify the part of the post that creates the strongest opportunity for meaningful discussion and build the comment around it naturally.\n"
+            f"Do not explicitly state that it is the most important, key, interesting, central, or main point of the post.\n\n"
             f"Do not try to respond equally to every point.\n\n"
 
             f"CRITICAL RULES FOR THE COMMENT:\n\n"
@@ -332,6 +333,29 @@ def run():
             f"16. Prefer adding a new observation, distinction, implication, or perspective rather than simply rephrasing the author's point.\n"
             f"    Avoid comments that mainly summarize, paraphrase, or restate what was already said in the post.\n"
             f"    Whenever possible, contribute a thought that expands, refines, challenges, or deepens the discussion.\n\n"
+
+            f"17. NATURAL OPENING RULE:\n"
+            f"   Do not begin the comment with meta-analysis phrases that summarize the post.\n\n"
+
+            f"   Avoid openings such as:\n"
+            f"   - 'The important part is...'\n"
+            f"   - 'The key thing is...'\n"
+            f"   - 'The interesting thing is...'\n"
+            f"   - 'What stands out is...'\n"
+            f"   - 'The real issue is...'\n"
+            f"   - 'The biggest takeaway is...'\n"
+            f"   - 'The part that caught my attention...'\n"
+            f"   - 'What jumped out at me...'\n\n"
+
+            f"   Instead, begin naturally by:\n"
+            f"   - reacting to a specific detail from the post\n"
+            f"   - sharing an observation\n"
+            f"   - sharing a related experience\n"
+            f"   - asking a focused follow-up question\n"
+            f"   - offering a perspective directly connected to the post\n\n"
+
+            f"   The first sentence should feel like a real Reddit user entering the discussion,\n"
+            f"   not an analyst summarizing the post.\n\n"
 
             f"OUTPUT FORMAT — strictly inside a single JSON code block:\n"
             f"{{\n"
