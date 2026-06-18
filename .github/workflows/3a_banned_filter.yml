@@ -1,0 +1,89 @@
+name: 3A. Banned Filter
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Roz UTC ke mutabik Raat 12:00 AM (5:30 AM IST) par chalega
+  workflow_dispatch: # Manual trigger ke liye
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  filter-subreddits:
+    runs-on: ubuntu-latest
+
+    # CRITICAL: Repo mein files modify karke push karne ki permission dena
+    permissions:
+      contents: write
+
+    steps:
+      # 1. Repository code checkout karna
+      - name: Checkout Repository Code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Full history fetch karega safe persistent push ke liye
+
+      # 2. Python Environment setup karna
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # 3. Git Author Identity configure karna
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      # 4. Pull Latest Changes (Taaki up-to-date code/files par run ho)
+      - name: Pull Latest Changes
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+          git pull origin "$BRANCH_NAME" --rebase
+
+      # 5. Python Packages install karna
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright playwright-stealth python-dotenv cryptography
+
+      # 6. Playwright Chromium install karna aur system deps configure karna
+      - name: Install Playwright Chromium
+        run: |
+          playwright install chromium --with-deps
+
+      # 7. Script ko execute karna
+      - name: Run Banned Filter Script
+        env:
+          DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }} # GitHub Secrets mein DECRYPT_KEY hona zaroori hai
+        run: |
+          python banned_filter.py
+
+      # 8. Agar process fail hota hai toh error screenshot save karna
+      - name: Upload Error Screenshot if script fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: banned-filter-error-screenshot
+          path: error_screenshot.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # 9. subreddits.txt aur banned.txt ke updates ko wapas commit aur push karna
+      - name: Commit and Push Cleaned Lists
+        if: always() # Hamesha run hoga taaki agar beech mein partial updates bhi hue hon toh push ho jaye
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+          
+          # Sirf tabhi add karein agar files create ya modify hui hon
+          [ -f subreddits.txt ] && git add subreddits.txt
+          [ -f banned.txt ] && git add banned.txt
+          
+          if git diff --staged --quiet; then
+            echo "[INFO] No banned subreddits detected. Files are unchanged. Skipping push."
+          else
+            echo "[OK] Ban logs updated. Committing and pushing updates..."
+            git commit -m "chore: update subreddits list and banned history [skip ci]"
+            git push origin "$BRANCH_NAME"
+          fi

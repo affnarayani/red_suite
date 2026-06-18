@@ -1,0 +1,93 @@
+name: 3B. Subreddits Scraper
+
+on:
+  workflow_dispatch: # Manual trigger ke liye
+  workflow_run:
+    workflows: ["3A. Banned Filter"] # Jab pehle wale workflow ka commit/push complete ho jaye
+    types:
+      - completed
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  scrape-subreddits:
+    runs-on: ubuntu-latest
+    # Sirf tabhi chalega jab manual ho YA pichla filter workflow successfully khatam hua ho
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    # CRITICAL: Changes ko wapas repository mein commit aur push karne ki permission
+    permissions:
+      contents: write
+
+    steps:
+      # 1. Repository code checkout karna
+      - name: Checkout Repository Code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Full history fetch karega safe persistent push ke liye
+
+      # 2. Python Environment setup karna
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # 3. Git Author Identity configure karna
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      # 4. Pull Latest Changes (Pichle workflow ke push kiye hue updates ko pull karne ke liye)
+      - name: Pull Latest Changes
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+          git pull origin "$BRANCH_NAME" --rebase
+
+      # 5. Python Packages install karna
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright playwright-stealth python-dotenv cryptography
+
+      # 6. Playwright Chromium install karna
+      - name: Install Playwright Chromium and system dependencies
+        run: |
+          playwright install chromium --with-deps
+
+      # 7. Scraper Script ko run karna
+      - name: Execute Scraper Script
+        env:
+          DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }} # GitHub Secrets se DECRYPT_KEY read karega
+        run: |
+          python subreddits_scraper.py
+
+      # 8. Agar scraper crash hota hai toh error screenshot upload karna
+      - name: Upload Error Screenshot if script fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-error-screenshot
+          path: error_screenshot.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # 9. Scrape kiye hue naye subreddits aur banned logs ko repo mein push karna
+      - name: Commit and Push Scraped Data
+        if: always() # Hamesha chalega taaki agar partial targets bhi dhoondhe hon toh save ho jayein
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+          
+          # Sirf unhi files ko add karein agar unme changes hue hon
+          [ -f subreddits.txt ] && git add subreddits.txt
+          [ -f banned.txt ] && git add banned.txt
+          
+          if git diff --staged --quiet; then
+            echo "[INFO] No new subreddits scraped or banned logs updated. Skipping push."
+          else
+            echo "[OK] New data detected. Committing and pushing updates..."
+            git commit -m "chore: update scraped subreddits and tracking history [skip ci]"
+            git push origin "$BRANCH_NAME"
+          fi
