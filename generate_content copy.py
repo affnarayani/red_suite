@@ -120,32 +120,61 @@ def load_cookies(file_path: Path) -> List[Dict[str, Any]]:
 # =========================
 # FILE PARSERS & WRITERS
 # =========================
-def get_random_subreddit() -> str:
-    print("[STEP] Reading subreddits.txt...", flush=True)
-    subreddits_file = Path("subreddits.txt")
-    if not subreddits_file.exists():
-        raise FileNotFoundError("❌ 'subreddits.txt' file nahi mila.")
+def get_last_topic() -> str:
+    print("[STEP] Reading topics.txt...", flush=True)
+    topics_file = Path("topics.txt")
+    if not topics_file.exists():
+        raise FileNotFoundError("❌ 'topics.txt' file nahi mila.")
     
-    with subreddits_file.open("r", encoding="utf-8") as f:
+    with topics_file.open("r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f if line.strip()]
+    
+    if not lines:
+        raise ValueError("❌ 'topics.txt' khali hai.")
+    
+    selected_topic = lines[-1]
+    print(f"[OK] Selected last topic: '{selected_topic}'", flush=True)
+    return selected_topic
+
+
+def get_subreddit_for_topic(topic: str) -> str:
+    print(f"[STEP] Searching exact subreddit for topic: '{topic}'...", flush=True)
+    mapping_file = Path("subreddit_mapping.json")
+    
+    if not mapping_file.exists():
+        raise FileNotFoundError("❌ 'subreddit_mapping.json' file nahi mila.")
+        
+    with mapping_file.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+        
+    for item in data.get("topics", []):
+        if item.get("topic", "").strip() == topic.strip():
+            subreddit = item.get("subreddit")
+            if subreddit:
+                print(f"[OK] Found exact subreddit: '{subreddit}'", flush=True)
+                return subreddit
+            else:
+                raise ValueError(f"❌ '{topic}' ke liye subreddit key khali (empty) hai.")
+                
+    raise ValueError(f"❌ Topic '{topic}' ka mapping 'subreddit_mapping.json' mein nahi mila.")
+
+
+def remove_last_topic_from_file():
+    print("[STEP] Removing the processed topic from topics.txt...", flush=True)
+    topics_file = Path("topics.txt")
+    if not topics_file.exists():
+        return
+        
+    with topics_file.open("r", encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
         
-    if not lines:
-        raise ValueError("❌ 'subreddits.txt' khali hai.")
+    if lines:
+        lines.pop()  # Remove last elements
         
-    selected_sub = random.choice(lines)
-    print(f"[OK] Randomly selected subreddit: '{selected_sub}'", flush=True)
-    return selected_sub
-
-
-def get_posted_history() -> List[Dict[str, str]]:
-    posted_file = Path("posted.json")
-    if not posted_file.exists():
-        return []
-    try:
-        with posted_file.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
+    with topics_file.open("w", encoding="utf-8") as f:
+        for line in lines:
+            f.write(f"{line}\n")
+    print("[OK] Topic successfully removed from topics.txt", flush=True)
 
 
 # =========================
@@ -182,10 +211,10 @@ def run():
         f.write("")
     print("[OK] 'reddit_post.json' cleared/initialized", flush=True)
 
-    # Get random subreddit and posted history
+    # Get topic and dynamic subreddit
     try:
-        subreddit_name = get_random_subreddit()
-        posted_history = get_posted_history()
+        topic = get_last_topic()
+        subreddit_name = get_subreddit_for_topic(topic)
     except Exception as e:
         print(f"[ERROR] Configurations files read karne me dikkat aayi: {e}", flush=True)
         sys.exit(1)
@@ -236,6 +265,7 @@ def run():
         # NEW: CHECK LOGIN SUCCESS VIA USER PROFILE BUTTON
         # ============================================
         print("[STEP] Checking login success via profile button...", flush=True)
+        # Matches any user name followed by 'Free, open'
         profile_button = page.get_by_role('button', name=list(map(lambda x: x.compile(r'.*Free, open'), [__import__('re')]))[0])
         
         if profile_button.count() > 0:
@@ -248,6 +278,7 @@ def run():
         # =========================
         print("[STEP] Locating chat textbox...", flush=True)
         
+        # Fallback Strategy for Textbox Locators
         textbox = page.get_by_role('textbox', name='Chat with ChatGPT')
         
         if textbox.count() == 0:
@@ -267,53 +298,47 @@ def run():
             
         custom_random_wait(15, 30)
 
-        # History context string format karein
-        history_context = json.dumps(posted_history, indent=2) if posted_history else "None"
-
-        # Prompt engineering for dynamic topic creation with expert persona
+        # Smart prompt engineering with specific separate paragraph format requirements
         prompt = (
             f"IMPORTANT: Your entire response must be wrapped in a single ```json code block. "
             f"Do not print any JSON outside of a code block. "
             f"Do not add any text, explanation, or markdown before or after the code block.\n\n"
 
-            f"TASK:\n"
-            f"1. Personally come up with a highly engaging, thought-provoking, and relevant topic specifically tailored for the subreddit: {subreddit_name}.\n"
-            f"2. Write a comprehensive Reddit post based on that generated topic.\n\n"
+            f"Write a Reddit post for {subreddit_name} on the topic: '{topic}'.\n\n"
 
-            f"CRITICAL RULES FOR TOPIC GENERATION:\n"
-            f"- The topic must perfectly align with what users in {subreddit_name} love discussing.\n"
-            f"- Here is the history of already posted topics on our end:\n"
-            f"```json\n{history_context}\n```\n"
-            f"- CRITICAL: Do NOT repeat any topic listed in the history above. If you address a similar core theme, you MUST approach it from a completely different, fresh, or counterintuitive angle. A completely new topic is highly preferred.\n\n"
-
-            f"CRITICAL RULES FOR THE REDDIT POST:\n"
+            f"CRITICAL RULES FOR REDDIT:\n"
             f"1. NO promotional links, no CTAs, no product mentions anywhere in the post.\n"
-            f"2. Write in first person. Portray yourself firmly as an expert or someone who deeply understands this dynamic with supreme confidence. "
-            f"DO NOT play the 'victim card', do not sound helpless, and do not make it a pure sob story. "
-            f"The perspective can be fictional but must feel completely real, authoritative, yet approachable. "
-            f"Include specific small details — a time, a precise psychological observation, a subtle human moment — "
-            f"that only an experienced person would notice. Imperfect sentences/hesitations are fine, but keep the expert clarity intact.\n"
-            f"3. Opening must hook immediately — start with 'I' and a gripping, relatable personal admission or realization.\n"
+            f"2. Write in first person with raw human emotion. "
+            f"The story can be fictional but must feel completely real. "
+            f"Include specific small details — a time, a feeling, a moment — "
+            f"that only someone who lived this would mention. "
+            f"Imperfect sentences are okay. Hesitation is okay. "
+            f"Sound like someone typing this at 11pm after a long day, not a content writer.\n"
+            f"3. Opening must hook immediately — start with 'I' and a relatable personal admission.\n"
             f"4. Length: strictly 1500-2500 characters. No longer.\n"
             f"5. Use short paragraphs — maximum 3-4 lines each. Reddit readers skim.\n"
-            f"6. Include 2-3 specific, highly actionable insights — not generic or basic advice.\n"
-            f"7. After the insights, include a key twist or counterintuitive reframe that fundamentally challenges the reader's basic assumption about the topic.\n"
-            f"8. Before the ending question, add a short closing reflection — 1-2 lines showing clear maturity or a evolved professional/personal perspective.\n"
-            f"9. End with an open question to invite heavy discussions and comments.\n"
-            f"10. Tone: like talking to a friend who respects your expertise, not teaching a rigid academic class.\n"
+            f"6. Include 2-3 specific, actionable insights — not generic advice.\n"
+            f"7. After the insights, include a key twist or counterintuitive reframe "
+            f"that challenges the reader's assumption about the topic.\n"
+            f"8. Before the ending question, add a short closing reflection — "
+            f"1-2 lines that show personal growth or changed perspective.\n"
+            f"9. End with an open question to invite comments.\n"
+            f"10. Tone: like talking to a friend, not teaching a class.\n"
             f"11. NO bullet point walls — maximum one set of 2-3 points in the entire post.\n\n"
 
             f"OUTPUT FORMAT — strictly inside a single JSON code block:\n"
             f"{{\n"
-            f'  "title": "The exact title you came up with for this topic — problem-first, curiosity-driven, no clickbait",\n'
+            f'  "title": "Engaging Reddit title — problem-first, curiosity-driven, no clickbait",\n'
             f'  "body": "Full Reddit post content here"\n'
             f"}}\n\n"
 
-            f"REMINDER 1: Title must feel like a real organic Reddit post — not a corporate blog headline.\n"
-            f"REMINDER 2: No Gumroad links, no ebook references, no marketing language whatsoever.\n"
-            f"REMINDER 3: HUMAN EXPERT VOICE IS NON-NEGOTIABLE. "
-            f"Avoid generic transition words or predictable motivational phrases like 'journey', 'pivotal', 'transformative', 'delve', 'foster', 'crucial'. "
-            f"Sound like someone writing a gold-standard response late at night because they care, not a mechanical content marketer.\n"
+            f"REMINDER 1: Title must feel like a real Reddit post — not a blog headline.\n"
+            f"REMINDER 2: No Gumroad link, no ebook mention, no promotional language anywhere.\n"
+            f"REMINDER 3: HUMAN VOICE IS NON-NEGOTIABLE. "
+            f"Avoid perfect transitions, avoid motivational poster language, "
+            f"avoid words like 'journey', 'pivotal', 'transformative', 'delve', 'foster', 'crucial'. "
+            f"Real people use casual words, half-finished thoughts, and honest admissions of failure. "
+            f"If the post sounds like it could be on a self-help website — rewrite it.\n"
         )
 
         print("[STEP] Entering prompt into textbox...", flush=True)
@@ -324,7 +349,7 @@ def run():
         send_button = page.get_by_test_id('send-button')
         send_button.click()
         
-        # Initial wait
+        # Initial wait taaki generation properly start ho sake
         custom_random_wait(30, 60)
 
         # ============================================
@@ -341,9 +366,10 @@ def run():
                 print("[OK] Code block visible, parsing live text size variations...", flush=True)
                 
                 last_length = 0
-                max_check_cycles = 15
+                max_check_cycles = 15  # 15 cycles * 15 seconds = Lagbhag 3.7 minutes max wait per attempt
                 
                 for cycle in range(max_check_cycles):
+                    # 15 seconds ka explicit sleep har state capture ke beech me
                     time.sleep(15)
                     
                     current_text = code_block_locator.first.inner_text().strip()
@@ -351,7 +377,9 @@ def run():
                     
                     print(f"[STREAM INFO] Cycle {cycle+1}: Previous Length = {last_length}, Current Length = {current_length}", flush=True)
                     
+                    # Agar text pichle 15 seconds me 1 char bhi nahi badha aur text khali nahi hai
                     if current_length > 0 and current_length == last_length:
+                        # Check text ki end JSON complete bracket `}` par ho rahi hai ya nahi
                         if current_text.endswith("}"):
                             json_content = current_text
                             print("[OK] Content generation is fully finished and finalized.", flush=True)
@@ -375,7 +403,7 @@ def run():
                     pass
                 sys.exit(1)
 
-        # JSON parsing, validation and Topic Saving
+        # JSON parsing, validation and Topic Cleaning
         if json_content:
             try:
                 print("[STEP] Parsing content as JSON...", flush=True)
@@ -386,10 +414,13 @@ def run():
                 
                 parsed_json = json.loads(json_content.strip())
                 
-                # Naya ordered dictionary format
+                # Title ko topic se sync karna
+                parsed_json["title"] = topic
+                
+                # NAYA CHANGE: Naya dictionary bana kar 'subreddit' ko 'title' se upar push kiya gaya hai
                 final_ordered_json = {
                     "subreddit": subreddit_name,
-                    "title": parsed_json.get("title", ""),
+                    "title": parsed_json["title"],
                     "body": parsed_json.get("body", "")
                 }
                 
@@ -397,6 +428,9 @@ def run():
                 with article_file.open("w", encoding="utf-8") as f:
                     json.dump(final_ordered_json, f, indent=4, ensure_ascii=False)
                 print("[OK] Article successfully saved to reddit_post.json with subreddit key on top", flush=True)
+                
+                # Success validation achieved: Safe to remove topic now
+                remove_last_topic_from_file()
 
                 # =====================================
                 # UPDATE STATUS
@@ -422,6 +456,7 @@ def run():
                 pass
             sys.exit(1)
 
+        # 15 to 30 seconds random wait before closing the browser normally
         print("[STEP] Performing random wait before normal browser closure...", flush=True)
         custom_random_wait(15, 30)
 
@@ -429,6 +464,9 @@ def run():
         raise
     except Exception as e:
         print("[ERROR]", e, flush=True)
+        # ============================================
+        # NEW: CAPTURE SCREENSHOT ON ERROR
+        # ============================================
         if 'page' in locals() and page:
             try:
                 screenshot_path = "error_screenshot.png"
@@ -436,6 +474,7 @@ def run():
                 print(f"[OK] Error screenshot captured: {screenshot_path}", flush=True)
             except Exception as screenshot_err:
                 print(f"[WARNING] Could not capture screenshot: {screenshot_err}", flush=True)
+        # ============================================
         if browser:
             try:
                 browser.close()
