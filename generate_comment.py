@@ -413,9 +413,6 @@ def run():
                 # Double safety: Remove any stray newlines from string
                 generated_comment_text = generated_comment_text.replace("\n", " ").replace("\r", "")
                 
-                # =====================================
-                # UPDATE STATUS.JSON ONLY (NO TOPICS.TXT INTERACTION)
-                # =====================================
                 print("[STEP] Updating status.json with comment data...", flush=True)
                 status_data["comment"] = generated_comment_text
                 status_data["comment_generated"] = True

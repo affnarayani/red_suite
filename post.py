@@ -27,6 +27,7 @@ HEADLESS = True
 REDDIT_COOKIES_FILE = "reddit_cookies.json.encrypted"
 STATUS_JSON_FILE = "status.json"
 REDDIT_POST_FILE = "reddit_post.json"
+POSTED_JSON_FILE = "posted.json"
 
 PBKDF2_ITERATIONS = 200_000
 
@@ -120,7 +121,6 @@ def human_type(page, text_to_type: str):
     Simulates human typing character by character.
     Converts multiple consecutive newlines (\n\n, \n\n\n, etc.) into a single \n.
     """
-    # Regex \n+ ka use karke multiple newlines ko single \n mein convert kiya
     cleaned_text = re.sub(r'\n+', '\n', text_to_type)
     
     for char in cleaned_text:
@@ -169,7 +169,7 @@ def run():
         print("❌ Subreddit, title, or body missing in reddit_post.json!", flush=True)
         sys.exit(1)
 
-    # Clean subreddit format (e.g., convert "r/Anxiety" or "Anxiety" to valid URL segment)
+    # Clean subreddit format
     if subreddit_name.startswith("r/"):
         cleaned_sub_name = subreddit_name[2:]
     elif subreddit_name.startswith("/r/"):
@@ -232,60 +232,33 @@ def run():
         human_type(page, post_title)
 
         # ====================================================
-        # DYNAMIC SUBREDDIT FLAIR SELECTION WITH FALLBACK
+        # CONDITIONAL FLAIR SELECTION WITH KEYBOARD SEQUENCES
         # ====================================================
-        flair_mapping = {
-            "anxiety": "Anxiety Resource",
-            "mentalhealth": "Opinion / Thoughts",
-            "productivity": "Book",
-            "getdisciplined": "💡 Advice"
-        }
-
-        current_sub_lower = cleaned_sub_name.lower().strip()
-
-        if current_sub_lower in flair_mapping:
-            flair_name = flair_mapping[current_sub_lower]
-            print(f"[STEP] Flair required for r/{cleaned_sub_name}. Selecting '{flair_name}'...", flush=True)
-
-            # 1. Click 'Add flair and tags *'
-            flair_btn = page.get_by_role('button', name='Add flair and tags *')
-            flair_btn.wait_for(state="visible", timeout=20000)
+        print("[STEP] Checking if flair button is available on page...", flush=True)
+        flair_btn = page.get_by_role('button', name='Add flair and tags *')
+        
+        if flair_btn.is_visible():
+            print("[INFO] Mandatory flair button found. Initiating interaction sequence...", flush=True)
             flair_btn.click()
             custom_random_wait(3, 6)
 
-            # 2. Specific Radio Button dhoondhne aur click karne ki koshish karein
-            flair_option = page.get_by_role('radio', name=flair_name)
-            try:
-                # Pehle short timeout (5s) ke sath check karein agar radio button seedhe mil jaye
-                flair_option.wait_for(state="visible", timeout=5000)
-                flair_option.click()
+            for i in range(1, 4):
+                print(f"[STEP] Sending TAB key ({i}/3)...", flush=True)
+                page.keyboard.press("Tab")
                 custom_random_wait(3, 6)
-            except Exception:
-                # Agar radio button nahi mila, toh check karein 'View all flairs' button toh nahi hai
-                print(f"[INFO] '{flair_name}' not visible instantly. Checking for 'View all flairs' button...", flush=True)
-                view_all_btn = page.get_by_role('button', name='View all flairs')
-                
-                if view_all_btn.is_visible():
-                    print("[STEP] 'View all flairs' button found. Clicking it to expand options...", flush=True)
-                    view_all_btn.click()
-                    custom_random_wait(3, 6)
-                    
-                    # Expand hone ke baad fir se radio button par click karne ki koshish karein
-                    flair_option.wait_for(state="visible", timeout=15000)
-                    flair_option.click()
-                    custom_random_wait(3, 6)
-                else:
-                    # Agar 'View all flairs' bhi nahi mila toh workflow crash na ho, exception raise karein
-                    raise RuntimeError(f"Could not find flair radio option '{flair_name}' nor 'View all flairs' button.")
 
-            # 3. Click 'Add' Button
+            print("[STEP] Sending SPACE key...", flush=True)
+            page.keyboard.press("Space")
+            custom_random_wait(3, 6)
+
+            print("[STEP] Clicking 'Add' button to submit flair...", flush=True)
             add_btn = page.get_by_role('button', name='Add', exact=True)
             add_btn.wait_for(state="visible", timeout=20000)
             add_btn.click()
             custom_random_wait(3, 6)
-            print(f"[OK] Flair '{flair_name}' applied successfully.", flush=True)
+            print("[OK] Flair interaction sequence completed successfully.", flush=True)
         else:
-            print(f"[INFO] No flair setup needed for r/{cleaned_sub_name}. Moving directly to post body.", flush=True)
+            print("[INFO] Flair button not found or not visible. Skipping flair selection safely...", flush=True)
         # ====================================================
 
         # Step 4: Wait 15-30s and focus/type Post Body text field
@@ -326,8 +299,35 @@ def run():
         except:
             pass
 
-        # 3. Post successfully submit hone par status ko false set karna
+        # 3. Post successfully submit hone par status aur history update karna
         if program_success:
+            # 3a. Update posted.json at the top
+            print(f"[STEP] Appending new topic to the top of {POSTED_JSON_FILE}...", flush=True)
+            posted_path = Path(POSTED_JSON_FILE)
+            existing_history = []
+            
+            if posted_path.exists():
+                try:
+                    with posted_path.open("r", encoding="utf-8") as hf:
+                        existing_history = json.load(hf)
+                        if not isinstance(existing_history, list):
+                            existing_history = []
+                except Exception:
+                    existing_history = []
+            
+            new_entry = {
+                "topic": post_title,
+                "subreddit": subreddit_name
+            }
+            
+            # List ke starting (index 0) me insert karne ke liye add kiya
+            updated_history = [new_entry] + existing_history
+            
+            with posted_path.open("w", encoding="utf-8") as hf:
+                json.dump(updated_history, hf, indent=4, ensure_ascii=False)
+            print(f"[OK] {POSTED_JSON_FILE} successfully updated (New entry added on top).", flush=True)
+
+            # 3b. Reset content_generated to false in status.json
             print(f"[STEP] Resetting content_generated to false in {STATUS_JSON_FILE}...", flush=True)
             status_data["content_generated"] = False
             with status_path.open("w", encoding="utf-8") as sf:

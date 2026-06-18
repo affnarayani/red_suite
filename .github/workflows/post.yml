@@ -84,6 +84,7 @@ jobs:
           # Sirf tabhi add karein agar files exist karti hon
           [ -f reddit_post.json ] && git add reddit_post.json
           [ -f status.json ] && git add status.json
+          [ -f posted.json ] && git add posted.json
           
           if git diff --staged --quiet; then
             echo "[INFO] No changes detected in status.json or reddit_post.json. Skipping push."
