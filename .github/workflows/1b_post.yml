@@ -1,9 +1,9 @@
-name: Post
+name: 1B. Post
 
 on:
   workflow_dispatch: # Manual trigger ke liye
   workflow_run:
-    workflows: ["Generate Content"] # Jab 'Generate Image' workflow khatam hoga tab trigger hoga
+    workflows: ["1A. Generate Content"] # Jab 'Generate Image' workflow khatam hoga tab trigger hoga
     types:
       - completed
 

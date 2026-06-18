@@ -1,9 +1,11 @@
-name: Generate Content
+name: 2B. Generate Comment
 
-on:
-  schedule:
-    - cron: '0 13 * * *' # Roz Indian Time (IST) ke mutabik 6:30 PM par chalega
-  workflow_dispatch:
+on: 
+  workflow_dispatch: 
+  workflow_run:
+    workflows: ["2A. Search Post to Comment"]
+    types:
+      - completed
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -11,6 +13,7 @@ env:
 jobs:
   run-automation:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     
     # CRITICAL: Permission granted for committing/pushing changes back to repo
     permissions:
@@ -46,7 +49,7 @@ jobs:
       env:
         DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }} # Ensure this is added in GitHub Secrets
       run: |
-        python generate_content.py
+        python generate_comment.py
 
     - name: Upload Error Screenshot
       if: failure() # Run only if python script crashes
@@ -57,17 +60,15 @@ jobs:
         if-no-files-found: ignore
 
     - name: Commit and Push Changes (If updated)
-      if: always() # Chalna chahiye chahe upar steps partial fail ho ya modify ho chuke hon
+      if: always() # Hamesha check karega taaki status change update ho sake
       run: |
-        # Only stage files if they exist to prevent 'pathspec' errors
-        [ -f reddit_post.json ] && git add reddit_post.json
+        # generate_comment.py sirf status.json ko update karta hai
         [ -f status.json ] && git add status.json
-        [ -f posted.json ] && git add posted.json
         
         if git diff --staged --quiet; then
-          echo "[INFO] No changes detected. Skipping push."
+          echo "[INFO] No changes detected in status.json. Skipping push."
         else
           echo "[OK] Changes detected. Committing and pushing updates..."
-          git commit -m "Automated: Update article and topics list [skip ci]"
+          git commit -m "Automated: Update comment generation status [skip ci]"
           git push origin ${GITHUB_REF_NAME}
         fi

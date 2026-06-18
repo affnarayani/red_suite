@@ -1,9 +1,9 @@
-name: Upvote and Comment
+name: 2C. Upvote and Comment
 
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Generate Comment"] # Jab 'Generate Comment' workflow khatam hoga tab trigger hoga
+    workflows: ["2B. Generate Comment"] # Jab 'Generate Comment' workflow khatam hoga tab trigger hoga
     types:
       - completed
 
