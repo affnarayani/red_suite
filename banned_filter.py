@@ -4,6 +4,7 @@ import time
 import base64
 import random
 import re
+import json
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -111,8 +112,6 @@ def load_cookies(file_path: Path) -> List[Dict[str, Any]]:
     return cookies
 
 
-import json
-
 # =========================
 # MAIN
 # =========================
@@ -130,7 +129,6 @@ def run():
         raise FileNotFoundError(f"❌ Configured file {SUBREDDITS_FILE} not found!")
 
     with subreddits_path.open("r", encoding="utf-8") as f:
-        # Original lines ko track rakhne ke liye pure list save kar rahe hain
         raw_subreddits = [line.strip() for line in f if line.strip()]
 
     if not raw_subreddits:
@@ -177,24 +175,45 @@ def run():
             print(f"[STEP] Opening Subreddit URL: {target_url}...", flush=True)
             try:
                 page.goto(target_url, wait_until="domcontentloaded")
-                custom_random_wait(5, 10)
+                custom_random_wait(15, 30)
 
-                # First post link dhoondhna aur click karna
-                post_links_by_role = page.locator("shreddit-post").get_by_role('link', name=re.compile(r'.+')).filter(
-                    has=page.locator("xpath=./ancestor-or-self::a[contains(@href, '/comments/')]")
-                )
+                # ========================================================
+                # LINK INTERACTION (WITH SCROLL RETRY FOR SLOW PAGES)
+                # ========================================================
+                print("[STEP] Searching for the first post link...", flush=True)
                 
-                post_link = post_links_by_role.first
+                post_link = None
+                # 5-6 baar scroll karke post link dhoondhne ki koshish karega
+                for post_search_attempt in range(6):
+                    post_links_by_role = page.locator("shreddit-post").get_by_role('link', name=re.compile(r'.+')).filter(
+                        has=page.locator("xpath=./ancestor-or-self::a[contains(@href, '/comments/')]")
+                    )
+                    
+                    if post_links_by_role.first.count() > 0:
+                        post_link = post_links_by_role.first
+                        break
+                        
+                    fallback_link = page.locator("a[href*='/comments/']").first
+                    if fallback_link.count() > 0:
+                        post_link = fallback_link
+                        break
+                        
+                    if post_search_attempt < 5:
+                        print(f"[SCROLL] First post not found yet. Scrolling to trigger render (Attempt {post_search_attempt + 1}/5)...", flush=True)
+                        page.evaluate("window.scrollBy(0, 300);")
+                        time.sleep(random.uniform(1.5, 2.5))
 
-                if post_link.count() == 0:
-                    post_link = page.locator("a[href*='/comments/']").first
+                if post_link is None:
+                    print(f"[WARNING] Failed to locate any post link on {current_sub} even after multiple scrolls. Skipping...", flush=True)
+                    continue
 
-                post_link.wait_for(state="visible", timeout=15000)
+                # Locator milne ke baad safe wait aur click sequence
+                post_link.wait_for(state="visible", timeout=30000)
                 post_link.scroll_into_view_if_needed()
                 
                 print("[STEP] Clicking on the first post link...", flush=True)
                 post_link.click()
-                custom_random_wait(5, 10)
+                custom_random_wait(15, 30)
 
                 full_url = page.url
                 clean_url_match = re.match(r'(https://www\.reddit\.com/r/[^/]+/comments/[^/]+/)', full_url)
