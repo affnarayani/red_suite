@@ -1,14 +1,15 @@
-name: 2A. Search Post to Comment
+name: 1A. Generate Content
 
 on:
   schedule:
-    - cron: '0 */3 * * *' # Har 3 ghante mein ek baar automatically chalega
+    - cron: '0 13 * * *' # Roz Indian Time (IST) ke mutabik 6:30 PM par chalega
   workflow_dispatch:
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  search-automation:
+  run-automation:
     runs-on: ubuntu-latest
     
     # CRITICAL: Permission granted for committing/pushing changes back to repo
@@ -70,24 +71,34 @@ jobs:
         pip install playwright playwright-stealth cryptography python-dotenv
         playwright install chromium --with-deps
 
-    - name: Run Search Script
+    - name: Run Script
       env:
         DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }}
         HTTP_PROXY: http://127.0.0.1:40000
         HTTPS_PROXY: http://127.0.0.1:40000
       run: |
-        python search_post_to_comment.py
+        python generate_content.py
 
-    - name: Commit and Push Status Changes
-      if: always() # Hamesha check karega taaki agar eligible post mili ho toh save ho jaye
+    - name: Upload Error Screenshot
+      if: failure() # Run only if python script crashes
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-error-screenshot
+        path: error_screenshot.png
+        if-no-files-found: ignore
+
+    - name: Commit and Push Changes (If updated)
+      if: always() # Chalna chahiye chahe upar steps partial fail ho ya modify ho chuke hon
       run: |
-        # Script sirf status.json ko modify karti hai ya create karti hai
+        # Only stage files if they exist to prevent 'pathspec' errors
+        [ -f reddit_post.json ] && git add reddit_post.json
         [ -f status.json ] && git add status.json
+        [ -f posted.json ] && git add posted.json
         
         if git diff --staged --quiet; then
-          echo "[INFO] No changes detected in status.json. Skipping push."
+          echo "[INFO] No changes detected. Skipping push."
         else
-          echo "[OK] Eligible post found and recorded. Committing status update..."
-          git commit -m "Automated: Fresh target post extracted [skip ci]"
+          echo "[OK] Changes detected. Committing and pushing updates..."
+          git commit -m "Automated: Update article and topics list [skip ci]"
           git push origin ${GITHUB_REF_NAME}
         fi

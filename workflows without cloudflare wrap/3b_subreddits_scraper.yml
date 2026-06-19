@@ -46,35 +46,6 @@ jobs:
           BRANCH_NAME="${GITHUB_REF_NAME:-main}"
           git pull origin "$BRANCH_NAME" --rebase
 
-      - name: Install and Start Cloudflare WARP Official Client
-        run: |
-          # 1. Cloudflare ka official gpg key aur repository add karein
-          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
-          
-          # 2. WARP client install karein
-          sudo apt-get update
-          sudo apt-get install -y cloudflare-warp
-          
-          # 3. WARP service ko background mein start karein
-          sudo systemctl start warp-svc
-          sleep 3
-          
-          # 4. Environment Variable ke sath Terms of Service accept aur register karein
-          export WARP_ACCEPT_TOS=1
-          
-          # Naye CLI mein global flag commands se PEHLE lagaya jata hai, is tarah:
-          warp-cli --accept-tos registration new || warp-cli registration new
-          
-          # 5. Client ko proxy mode par set karke connect karein
-          warp-cli --accept-tos mode proxy || warp-cli mode proxy
-          warp-cli --accept-tos connect || warp-cli connect
-          
-          # 6. Proxy status verification
-          sleep 5
-          warp-cli --accept-tos status || warp-cli status
-          echo "[OK] Cloudflare WARP is running on local proxy port 40000"
-
       # 5. Python Packages install karna
       - name: Install Dependencies
         run: |
@@ -89,9 +60,7 @@ jobs:
       # 7. Scraper Script ko run karna
       - name: Execute Scraper Script
         env:
-          DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }}
-          HTTP_PROXY: http://127.0.0.1:40000
-          HTTPS_PROXY: http://127.0.0.1:40000
+          DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }} # GitHub Secrets se DECRYPT_KEY read karega
         run: |
           python subreddits_scraper.py
 
