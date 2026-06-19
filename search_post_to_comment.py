@@ -199,7 +199,7 @@ def run():
         if selected_subreddit.startswith("/"):
             selected_subreddit = selected_subreddit[1:]
             
-        target_url = f"https://www.reddit.com/{selected_subreddit}/rising/?feedViewType=compactView"
+        target_url = f"https://www.reddit.com/{selected_subreddit}/new/?feedViewType=compactView"
         
         print(f"[STEP] Opening chosen Subreddit URL (Compact View): {target_url}...", flush=True)
         page.goto(target_url, wait_until="domcontentloaded")
