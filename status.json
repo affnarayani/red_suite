@@ -2,7 +2,7 @@
     "content_generated": false,
     "post_to_comment_found": true,
     "link_to_post_to_comment": "https://www.reddit.com/r/nosurf/comments/1uc2eco/",
-    "content_of_post_to_comment": "I downloaded Opal to help regulate my screen time, and it\u2019s helped a lot. However, I can never get an accurate reading with it. Today, I JUST picked up my iPhone for the first time, checked Opal, and it says I already have 9 hours of screen time sometimes at 12am start of new day it would say I\u2019m at 3 hours which is literally impossible..\n\nI know this isn\u2019t possible since I don\u2019t even have access to my phone for more than 3 hours a day. It's been really frustrating because Opal gives me weekly reports with huge, inflated numbers that are way higher than my iOS Screen Time (showing 6\u20139 hours instead of my actual 1\u20132.5 hours). Does anyone else have this issue?!",
-    "comment_generated": false,
-    "comment": ""
+    "content_of_post_to_comment": "I downloaded Opal to help regulate my screen time, and it’s helped a lot. However, I can never get an accurate reading with it. Today, I JUST picked up my iPhone for the first time, checked Opal, and it says I already have 9 hours of screen time sometimes at 12am start of new day it would say I’m at 3 hours which is literally impossible..\n\nI know this isn’t possible since I don’t even have access to my phone for more than 3 hours a day. It's been really frustrating because Opal gives me weekly reports with huge, inflated numbers that are way higher than my iOS Screen Time (showing 6–9 hours instead of my actual 1–2.5 hours). Does anyone else have this issue?!",
+    "comment_generated": true,
+    "comment": "The fact that it shows 3 hours right at 12am makes it sound more like a data syncing or reporting bug than actual screen time tracking. If iOS Screen Time is consistently showing 1–2.5 hours and Opal is reporting 6–9, I'd trust Apple's numbers first. Have you checked whether Opal is counting background activity or pulling old Screen Time data from another device?"
 }
