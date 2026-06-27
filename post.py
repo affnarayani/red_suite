@@ -229,7 +229,7 @@ def run():
         title_box = page.get_by_role('textbox', name='Title')
         title_box.wait_for(state="visible", timeout=20000)
         title_box.click()
-        human_type(page, f"[Text] {post_title}")
+        human_type(page, f"{post_title}")
 
         # ====================================================
         # CONDITIONAL FLAIR SELECTION WITH KEYBOARD SEQUENCES
