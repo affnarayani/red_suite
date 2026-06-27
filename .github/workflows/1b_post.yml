@@ -122,5 +122,6 @@ jobs:
           else
             echo "[OK] Status changed. Committing and pushing updates..."
             git commit -m "chore: mark article as posted [skip ci]"
-            git push origin "$BRANCH_NAME"
+            git pull origin ${GITHUB_REF_NAME} --rebase
+          git push origin ${GITHUB_REF_NAME}
           fi
