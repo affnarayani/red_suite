@@ -1,8 +1,8 @@
 {
     "content_generated": false,
-    "post_to_comment_found": false,
-    "link_to_post_to_comment": "",
-    "content_of_post_to_comment": "",
+    "post_to_comment_found": true,
+    "link_to_post_to_comment": "https://www.reddit.com/r/nosurf/comments/1umqhka/",
+    "content_of_post_to_comment": "i'm 19 and my youtube usage was embarrassing. i'd open it to watch one lecture and 40 minutes later i'm watching some guy review vending machines in japan.\n\nat some point i realized it's not even the videos. it's the feed. you open youtube and there's 20 thumbnails screaming at you and your brain just picks whichever one screams loudest. you never actually chose anything.\n\nso i made a little chrome extension for myself. it hides the whole feed and just shows me one video. i either watch it or skip it. that's it. i also added a strict mode because i kept quitting videos halfway, so now it just doesn't let me leave until i've watched a few minutes lol.\n\nthe thing that surprised me most was a small feature where instead of the thumbnail, i just see a plain text description of what the video is actually about. and dude. when you read what a video is about in boring normal words, most of the stuff i used to click sounds so uninteresting. i was picking videos with my lizard brain this whole time and had no idea.\n\nbeen using it for 2 weeks now and my watch history actually looks like me for once. put it on the chrome store cause friends asked, happy to share if anyone wants it. and yeah i know unhook exists, i just wanted something stricter.",
     "comment_generated": false,
     "comment": ""
 }
