@@ -1,8 +1,8 @@
 {
     "content_generated": false,
-    "post_to_comment_found": false,
-    "link_to_post_to_comment": "",
-    "content_of_post_to_comment": "",
+    "post_to_comment_found": true,
+    "link_to_post_to_comment": "https://www.reddit.com/r/getdisciplined/comments/1uslusw/",
+    "content_of_post_to_comment": "Hey guys,\n\nI\u2019ve always struggled to stick to normal habit trackers because checking off a box gets boring after like three days. So over the last few months, I built a web app that basically turns your real life into an RPG.\n\nInstead of just a to-do list, your habits are tied to an actual game economy, complete with an item shop, RNG loot drops, and boss fights.\n\nHere is how it works right now:\n\nRarity-Based Quests: Your daily tasks have rarities from Common (like \"Drink water\") all the way up to Mythic (like \"3 hours of Deep Work\"). Harder quests give way more XP and Gold.\n\nStats That Actually Decay: You have real RPG attributes (Strength, Discipline, Wisdom, Confidence, Focus). If you do gym or bodyweight quests, your Strength goes up. If you start skipping days, your stats actually decay and you lose your streak. (I also hooked up the Hevy API, so if you log your gym workouts there, it automatically shields your stats from decaying on rest days).\n\nWeekend Boss Fights: This is my favorite part. During the week, there\u2019s a countdown. On Saturday, a Boss spawns with a massive HP bar. You have to complete dedicated \"Boss Quests\" and your normal daily habits to deal damage to it before the weekend ends.\n\nLoot & Item Shop: If you execute a boss or finish a high-tier quest, you get Gold and a chance at item drops. There\u2019s a daily rotating shop where you can buy consumables like XP potions, Streak Freezes, or reroll tokens to change out your quests.\n\nCollection: There's an inventory and a \"Bestiary\" that tracks all the different items you've found and the bosses you've defeated.\n\nI just finished fixing the economy math and getting the boss health bars working perfectly. I\u2019m getting ready to invite people to test it out and see if they can actually beat a Mythic boss without the game breaking.\n\n- DM me if you want to try it yourself!\n- THIS TOOL IS 100% FREE",
     "comment_generated": false,
     "comment": ""
 }
