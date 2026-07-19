@@ -42,6 +42,7 @@ jobs:
           BRANCH_NAME="${GITHUB_REF_NAME:-main}"
           git pull origin "$BRANCH_NAME" --rebase
 
+      # 5. Install and Start Cloudflare WARP (TUN Global Mode)
       - name: Install and Start Cloudflare WARP (TUN Global Mode)
         run: |
           # 1. Repository aur GPG Key set karein
@@ -69,25 +70,26 @@ jobs:
           # 7. Verify ki pure system ka IP change hua ya nahi
           curl https://cloudflare.com/cdn-cgi/trace
 
-      # 5. Python Packages install karna
+      # 6. Python Packages install karna
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright playwright-stealth python-dotenv cryptography
+          pip install playwright playwright-stealth python-dotenv cryptography requests
 
-      # 6. Playwright Chromium install karna aur system deps configure karna
+      # 7. Playwright Chromium install karna aur system deps configure karna
       - name: Install Playwright Chromium
         run: |
           playwright install chromium --with-deps
 
-      # 7. Script ko execute karna
+      # 8. Script ko execute karna
       - name: Run Banned Filter Script
         env:
           DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }}
+          IMGBBB_API_KEY: ${{ secrets.IMGBBB_API_KEY }}
         run: |
           python banned_filter.py
 
-      # 8. Agar process fail hota hai toh error screenshot save karna
+      # 9. Agar process fail hota hai toh error screenshot save karna
       - name: Upload Error Screenshot if script fails
         if: failure()
         uses: actions/upload-artifact@v4
@@ -97,7 +99,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      # 9. subreddits.txt aur banned.txt ke updates ko wapas commit aur push karna
+      # 10. subreddits.txt aur banned.txt ke updates ko wapas commit aur push karna
       - name: Commit and Push Cleaned Lists
         if: always() # Hamesha run hoga taaki agar beech mein partial updates bhi hue hon toh push ho jaye
         run: |
