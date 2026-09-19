@@ -3,6 +3,6 @@
     "post_to_comment_found": true,
     "link_to_post_to_comment": "https://www.reddit.com/r/nosurf/comments/1wkgvyn/",
     "content_of_post_to_comment": "Browser extensions never worked for me. I could disable them in two clicks whenever I was weak. So I built something that blocks the whole device instead.\n\n**What it does**\n\n- Always-on blocking of porn, gambling, piracy, and VPN/proxy bypass\n\n- Social media (Instagram, TikTok, X, YouTube) is hard-blocked 8pm-9am and open the rest of the day, with a manual toggle\n\n- WhatsApp, Telegram, and Messenger stay exempt so you can still reach people\n\n- The \"disable\" button is a deliberate 24h countdown that never finishes\n\n**How it works**\n\nIt filters at the DNS/VPN level on the device. There's no backend, no account, and no telemetry. Everything stays local. It's free and open source.\n\nGitHub: https://github.com/pratikkuikel/distraction-free\n\nProduct Hunt (launched today): https://www.producthunt.com/products/distraction-free?launch=distraction-free\n\nI'd like feedback on the \"can't easily undo it\" design. Is a 24h countdown that never finishes too harsh, or is that the point? There's also a built-in diagnostic log you can export if you hit a bug. Attach it to a GitHub issue and I'll dig in.",
-    "comment_generated": false,
-    "comment": ""
+    "comment_generated": true,
+    "comment": "The 24h countdown idea is interesting because most blockers fail at the exact moment someone wants to bypass them. The one thing I'd watch is whether users eventually find workarounds outside the app; making the friction meaningful without making recovery impossible seems like a tricky balance. A local-only approach is a nice choice though."
 }
