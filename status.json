@@ -1,8 +1,8 @@
 {
     "content_generated": false,
-    "post_to_comment_found": true,
-    "link_to_post_to_comment": "https://www.reddit.com/r/nosurf/comments/1wmwamn/",
-    "content_of_post_to_comment": "Since about a month, screenzen keeps popping up a notification that reads \"accessibility service needs restart\" \"please toggle your accessibility service off and on in settings\"\n\nAnd everytime I do exactly as that says, and screenzen functions normally after that. The problem is that every time I fix it, just a few hours later the notification pops up again! So i have to fix it everyday, every hour.\n\nAnd if I forget to do that, of course it doesn't work and I end up doomscrolling\n\nHas anybody been having this issue?\n\nI don't think there's a way if fixing it, I guess i will have to just keep on turning the accessibility service off and on :/ It's uncomfortable\n\nBut if anybody were to know a solution, that would be great",
-    "comment_generated": true,
-    "comment": "I had a similar issue with an app relying on accessibility permissions. Sometimes Android kills those services after battery optimization or background restrictions kick in. It might be worth checking ScreenZen's battery settings and making sure it's set to unrestricted, especially if this started after an update. Also curious what phone model and Android version you're on, since some manufacturers are much more aggressive about killing accessibility services."
+    "post_to_comment_found": false,
+    "link_to_post_to_comment": "",
+    "content_of_post_to_comment": "",
+    "comment_generated": false,
+    "comment": ""
 }
