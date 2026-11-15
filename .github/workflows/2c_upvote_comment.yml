@@ -7,6 +7,9 @@ on:
     types:
       - completed
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: write # Grants permission to modify and push json state changes back to the repository
 
@@ -22,9 +25,9 @@ jobs:
         uses: actions/checkout@v5
         with:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-          fetch-depth: 0 
+          fetch-depth: 0
 
-      # 2. Configure Python Environment using reference version
+      # 2. Configure Python Environment
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -45,25 +48,25 @@ jobs:
           # 1. Repository aur GPG Key set karein
           curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
-          
+
           # 2. Install
           sudo apt-get update && sudo apt-get install -y cloudflare-warp
-          
+
           # 3. Start Service
           sudo systemctl start warp-svc
           sleep 2
-          
+
           # 4. Register (New CLI Syntax compatible)
           warp-cli --accept-tos registration new || warp-cli registration new
-          
+
           # 5. STRICT FIX: Mode ko PROXY se badal kar TUN (Standard VPN) karein
           # Yeh pure GitHub runner ka internet traffic WARP se routing kar dega
           warp-cli --accept-tos mode warp || warp-cli mode warp
-          
+
           # 6. Connect
           warp-cli --accept-tos connect || warp-cli connect
           sleep 5
-          
+
           # 7. Verify ki pure system ka IP change hua ya nahi
           curl https://cloudflare.com/cdn-cgi/trace
 
@@ -71,7 +74,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install playwright playwright-stealth cryptography python-dotenv requests; fi
+          pip install -r requirements.txt
 
       # 4. Set up Playwright Chromium browser and its system binaries
       - name: Install Playwright and System Dependencies
@@ -82,7 +85,7 @@ jobs:
       - name: Run Reddit Upvote and Comment Script
         env:
           DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }}
-          IMGBBB_API_KEY: ${{ secrets.IMGBBB_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python upvote_comment.py
 
@@ -92,27 +95,28 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           BRANCH_NAME="${GITHUB_REF_NAME:-main}"
-          
+
           # 1. Jo local changes python script ne kiye hain, unhe temporarily stash (hide) karo
           git stash
-          
+
           # 2. Pull down remote updates safely without conflict
           git pull origin "$BRANCH_NAME" --rebase
-          
+
           # 3. Stashed changes ko wapas apply karo (agar koi change nahi tha toh error na aaye isliye || true)
           git stash pop || true
-          
+
           # Only stage the intended files
-          [ -f status.json ] && git add status.json
-          [ -f commented.json ] && git add commented.json
-          
+          [ -f json/status.json ] && git add json/status.json
+          [ -f json/commented.json ] && git add json/commented.json
+          [ -d locators ] && git add locators/
+
           # Check if there are any staged modifications before performing the commit step
           if git diff --staged --quiet; then
             echo "No new changes to commit."
           else
             git commit -m "chore: update automation history state [skip ci]"
-            git pull origin ${GITHUB_REF_NAME} --rebase
-            git push origin ${GITHUB_REF_NAME}
+            git pull origin "$BRANCH_NAME" --rebase
+            git push origin "$BRANCH_NAME"
           fi

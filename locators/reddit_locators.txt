@@ -1,0 +1,79 @@
+# =============================================================================
+# Reddit locators
+# Used by: post.py, banned_filter.py, search_post_to_comment.py,
+#          upvote_comment.py, subreddits_scraper.py
+#
+# Format:  variable_name = <playwright expression> :: primary|fallback
+# - The first line for a variable is the PRIMARY locator.
+# - Following lines with the same name are FALLBACKS (tried in order).
+# - Resolution order: primary -> fallbacks -> Gemini vision.
+# - The ":: primary|fallback" marker is optional and only for readability.
+# =============================================================================
+
+# --- Create post flow (post.py, subreddits_scraper.py) -----------------------
+# "Create Post" button on a subreddit page.
+create_post_btn = page.get_by_test_id('create-post') :: primary
+create_post_btn = page.locator("a[data-testid='create-post']") :: fallback
+
+# Title input on the create-post form.
+post_title_box = page.get_by_role('textbox', name='Title') :: primary
+
+# Optional "Add flair and tags" button (only present when a flair is required).
+flair_and_tags_btn = page.get_by_role('button', name='Add flair and tags *') :: primary
+
+# "Add" button that submits the selected flair.
+flair_add_btn = page.get_by_role('button', name='Add', exact=True) :: primary
+
+# Main post body editor.
+post_body_box = page.get_by_role('textbox', name='Post body text field') :: primary
+
+# Final "Post" submit button.
+submit_post_btn = page.get_by_role('button', name='Post', exact=True) :: primary
+
+# --- Feed / post link (banned_filter.py, search_post_to_comment.py) ----------
+# First real post link in a compact feed (shreddit-post wrapper).
+first_post_link = page.locator("shreddit-post").get_by_role('link', name=re.compile(r'.+')).filter(has=page.locator("xpath=./ancestor-or-self::a[contains(@href, '/comments/')]")) :: primary
+first_post_link = page.locator("a[href*='/comments/']").first :: fallback
+
+# --- Ban detection (banned_filter.py) ---------------------------------------
+# Warning shown when the account is banned from a subreddit.
+ban_warning_text = page.get_by_text("You're currently banned from", exact=False) :: primary
+
+# --- Post text extraction (search_post_to_comment.py) -----------------------
+# Readable body text of a post.
+post_text_body = page.locator("shreddit-post-text-body [slot='text-body']").first :: primary
+post_text_body = page.locator("[data-post-click-location='text-body']").first :: fallback
+
+# --- Commenting (upvote_comment.py) -----------------------------------------
+# "Go to comments" button on a post page.
+go_to_comments_btn = page.get_by_role('button', name='Go to comments') :: primary
+
+# Rich-text comment composer box.
+comment_composer = page.locator('[data-testid="comment-composer-richtext"], [contenteditable="true"]').first :: primary
+
+# "Comment" submit button.
+submit_comment_btn = page.get_by_role('button', name='Comment', exact=True) :: primary
+
+# --- Upvote (upvote_comment.py) ---------------------------------------------
+# Upvote button on a post.
+upvote_button = page.get_by_test_id('action-row').get_by_role('button', name='Upvote').first :: primary
+upvote_button = page.get_by_role('button', name='Upvote').first :: fallback
+
+# --- Subreddit discovery / filtering (subreddits_scraper.py) ----------------
+# All anchor tags on the current page (used to scan for subreddit links).
+all_page_links = page.locator("a") :: primary
+
+# "Bot Bouncer" link in a subreddit's about page (marks the sub as hostile).
+bot_bouncer_link = page.get_by_role('link', name='Bot Bouncer') :: primary
+
+# Weekly active users count on the subreddit about page.
+weekly_active_users = page.locator('span[slot="weekly-active-users-count"]') :: primary
+
+# Weekly contributions count on the subreddit about page.
+weekly_contributions = page.locator('span[slot="weekly-contributions-count"]') :: primary
+
+# "Post in Similar Communities" button (shown when posting is restricted).
+similar_communities_btn = page.get_by_role('button', name='Post in Similar Communities') :: primary
+
+# "You can't contribute in this" text (shown when posting is restricted).
+cannot_contribute_text = page.get_by_text("You can't contribute in this") :: primary

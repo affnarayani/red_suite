@@ -2,101 +2,108 @@ name: 1A. Generate Content
 
 on:
   schedule:
-    - cron: '0 13 * * *' # Roz Indian Time (IST) ke mutabik 6:30 PM par chalega
+    - cron: '0 0,7,14,21 * * *' # Har 7 ghante mein ek baar automatically chalega
   workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  run-automation:
+  content-automation:
     runs-on: ubuntu-latest
-    
-    # CRITICAL: Permission granted for committing/pushing changes back to repo
+
+    # CRITICAL: Repo mein files modify karke push karne ki permission dena
     permissions:
       contents: write
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v5
-      with:
-        fetch-depth: 0 # Full history fetch karega safe dynamic push ke liye
+      # 1. Repository code checkout karna
+      - name: Checkout Repository Code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Full history fetch karega safe persistent push ke liye
 
-    - name: Set up Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: '3.11'
+      # 2. Python Environment setup karna
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
 
-    - name: Configure Git
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      # 3. Git Author Identity configure karna
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: Pull Latest Changes (Maintain Persistence)
-      run: |
-        git pull origin ${GITHUB_REF_NAME} --rebase
+      # 4. Pull Latest Changes (Taaki up-to-date code/files par run ho)
+      - name: Pull Latest Changes
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+          git pull origin "$BRANCH_NAME" --rebase
 
-    - name: Install and Start Cloudflare WARP (TUN Global Mode)
-      run: |
-        # 1. Repository aur GPG Key set karein
-        curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
-        
-        # 2. Install
-        sudo apt-get update && sudo apt-get install -y cloudflare-warp
-        
-        # 3. Start Service
-        sudo systemctl start warp-svc
-        sleep 2
-        
-        # 4. Register (New CLI Syntax compatible)
-        warp-cli --accept-tos registration new || warp-cli registration new
-        
-        # 5. STRICT FIX: Mode ko PROXY se badal kar TUN (Standard VPN) karein
-        # Yeh pure GitHub runner ka internet traffic WARP se routing kar dega
-        warp-cli --accept-tos mode warp || warp-cli mode warp
-        
-        # 6. Connect
-        warp-cli --accept-tos connect || warp-cli connect
-        sleep 5
-        
-        # 7. Verify ki pure system ka IP change hua ya nahi
-        curl https://cloudflare.com/cdn-cgi/trace
+      # 5. Install and Start Cloudflare WARP (TUN Global Mode)
+      - name: Install and Start Cloudflare WARP (TUN Global Mode)
+        run: |
+          # 1. Repository aur GPG Key set karein
+          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
 
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install playwright playwright-stealth cryptography python-dotenv requests
-        playwright install chromium --with-deps
+          # 2. Install
+          sudo apt-get update && sudo apt-get install -y cloudflare-warp
 
-    - name: Run Script
-      env:
-        DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }}
-        IMGBBB_API_KEY: ${{ secrets.IMGBBB_API_KEY }}
-      run: |
-        python generate_content.py
+          # 3. Start Service
+          sudo systemctl start warp-svc
+          sleep 2
 
-    - name: Upload Error Screenshot
-      if: failure() # Run only if python script crashes
-      uses: actions/upload-artifact@v4
-      with:
-        name: playwright-error-screenshot
-        path: error_screenshot.png
-        if-no-files-found: ignore
+          # 4. Register (New CLI Syntax compatible)
+          warp-cli --accept-tos registration new || warp-cli registration new
 
-    - name: Commit and Push Changes (If updated)
-      if: always() # Chalna chahiye chahe upar steps partial fail ho ya modify ho chuke hon
-      run: |
-        # Only stage files if they exist to prevent 'pathspec' errors
-        [ -f reddit_post.json ] && git add reddit_post.json
-        [ -f status.json ] && git add status.json
-        [ -f posted.json ] && git add posted.json
-        
-        if git diff --staged --quiet; then
-          echo "[INFO] No changes detected. Skipping push."
-        else
-          echo "[OK] Changes detected. Committing and pushing updates..."
-          git commit -m "Automated: Update article and topics list [skip ci]"
-          git pull origin ${GITHUB_REF_NAME} --rebase
-          git push origin ${GITHUB_REF_NAME}
-        fi
+          # 5. STRICT FIX: Mode ko PROXY se badal kar TUN (Standard VPN) karein
+          # Yeh pure GitHub runner ka internet traffic WARP se routing kar dega
+          warp-cli --accept-tos mode warp || warp-cli mode warp
+
+          # 6. Connect
+          warp-cli --accept-tos connect || warp-cli connect
+          sleep 5
+
+          # 7. Verify ki pure system ka IP change hua ya nahi
+          curl https://cloudflare.com/cdn-cgi/trace
+
+      # 6. Python Packages install karna (all deps from requirements.txt)
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 7. Playwright Chromium install karna aur system deps configure karna
+      - name: Install Playwright Chromium
+        run: |
+          playwright install chromium --with-deps
+
+      # 8. Content Generation Script ko execute karna
+      - name: Run Content Generation Script
+        env:
+          DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python generate_content.py
+
+      # 9. Updated article and status files wapas commit aur push karna
+      - name: Commit and Push Generated Content and Status
+        if: always()
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+
+          [ -f json/reddit_post.json ] && git add json/reddit_post.json
+          [ -f json/status.json ] && git add json/status.json
+          [ -d locators ] && git add locators/
+
+          if git diff --staged --quiet; then
+            echo "[INFO] No new generated content found. Files are unchanged. Skipping push."
+          else
+            echo "[OK] New content generated. Committing and pushing article and status updates..."
+            git commit -m "chore: update generated article and status [skip ci]"
+            git pull origin "$BRANCH_NAME" --rebase
+            git push origin "$BRANCH_NAME"
+          fi

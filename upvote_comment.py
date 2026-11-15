@@ -1,148 +1,37 @@
-import os
-import sys
 import json
-import time
-import base64
-import random
 import re
-import requests
+import sys
 from pathlib import Path
-from typing import List, Dict, Any
 
 from dotenv import load_dotenv
 
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.exceptions import InvalidTag
-
-from playwright.sync_api import sync_playwright
-from playwright_stealth import Stealth
+from common import browser
+from common.crypto import load_cookies
+from common.locators import LocatorBook, apply_auto_correct
+from common.paths import COMMENTED_JSON_FILE, REDDIT_COOKIES_FILE, STATUS_FILE
 
 
-# =========================
-# CONFIG
-# =========================
-HEADLESS = True
-
-REDDIT_COOKIES_FILE = "reddit_cookies.json.encrypted"
-STATUS_JSON_FILE = "status.json"
-COMMENTED_JSON_FILE = "commented.json"
-
-PBKDF2_ITERATIONS = 200_000
-
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+def _reset_status(status_data, status_path):
+    status_data["post_to_comment_found"] = False
+    status_data["comment_generated"] = False
+    status_data["link_to_post_to_comment"] = ""
+    status_data["content_of_post_to_comment"] = ""
+    status_data["comment"] = ""
+    with status_path.open("w", encoding="utf-8") as sf:
+        json.dump(status_data, sf, indent=4)
 
 
-# =========================
-# ENV
-# =========================
-load_dotenv()
-
-DECRYPT_KEY = os.getenv("DECRYPT_KEY")
-
-if not DECRYPT_KEY:
-    raise RuntimeError("DECRYPT_KEY missing")
-
-
-# =========================
-# RANDOM WAIT (REQUIRED LOCATOR DELAYS)
-# =========================
-def custom_random_wait(min_sec=5, max_sec=10):
-    seconds = random.uniform(min_sec, max_sec)
-    print(f"[WAIT] Sleeping for {seconds:.2f} seconds...", flush=True)
-    time.sleep(seconds)
-
-
-# =========================
-# CRYPTO
-# =========================
-def _derive_key(password: bytes, salt: bytes) -> bytes:
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=PBKDF2_ITERATIONS,
-    )
-    return kdf.derive(password)
-
-
-def _decrypt_payload(payload: Dict[str, Any], password: str) -> bytes:
-    salt = base64.b64decode(payload["s"])
-    nonce = base64.b64decode(payload["n"])
-    ciphertext = base64.b64decode(payload["ct"])
-
-    key = _derive_key(password.encode("utf-8"), salt)
-    aesgcm = AESGCM(key)
-
-    try:
-        return aesgcm.decrypt(nonce, ciphertext, None)
-    except InvalidTag:
-        raise RuntimeError("❌ Decryption failed (InvalidTag)")
-
-
-def load_cookies(file_path: Path) -> List[Dict[str, Any]]:
-    print("[STEP] Loading cookies...", flush=True)
-
-    with file_path.open("r", encoding="utf-8") as f:
-        payload = json.load(f)
-
-    plaintext = _decrypt_payload(payload, DECRYPT_KEY)
-    cookies = json.loads(plaintext.decode("utf-8"))
-
-    for c in cookies:
-        if "partitionKey" in c and isinstance(c["partitionKey"], dict):
-            if "topLevelSite" in c["partitionKey"]:
-                c["partitionKey"] = str(c["partitionKey"]["topLevelSite"])
-            else:
-                del c["partitionKey"]
-
-        if "sameSite" in c:
-            val = str(c["sameSite"]).lower()
-
-            if val in ["no_restriction", "none", "unspecified", "null"]:
-                c["sameSite"] = "None"
-            elif val == "lax":
-                c["sameSite"] = "Lax"
-            elif val == "strict":
-                c["sameSite"] = "Strict"
-            else:
-                c["sameSite"] = "Lax"
-
-    print("[OK] Cookies loaded", flush=True)
-    return cookies
-
-def upload_to_onlyfiles(screenshot_path):
-    url = "https://api.onlyfiles.com/v1/upload"
-
-    with open(screenshot_path, "rb") as file:
-        # expire = 172800 seconds (48 hours) tak file upload rahegi
-        response = requests.post(url, files={"file": file}, data={"expire": 172800})
-
-    if response.status_code == 200:
-        res_data = response.json()
-        if res_data.get("status"):
-            direct_url = res_data["data"]["file"]["url"]["full"]
-            print(f"👉 DIRECT LINK (Expires in 48 Hours): {direct_url}")
-            return direct_url
-        print(f"[WARNING] Upload Failed: {res_data.get('error', {}).get('message', 'Unknown error')}")
-        return None
-    else:
-        print(f"[WARNING] Upload Failed: {response.status_code}")
-        return None
-
-# =========================
-# MAIN
-# =========================
 def run():
     print("[START] Script started", flush=True)
+
+    apply_auto_correct()
 
     # ========================================================
     # STATUS JSON VALIDATION
     # ========================================================
-    status_path = Path(STATUS_JSON_FILE)
+    status_path = Path(STATUS_FILE)
     if not status_path.exists():
-        raise FileNotFoundError(f"❌ Status file {STATUS_JSON_FILE} not found!")
+        raise FileNotFoundError(f"[ERROR] Status file {STATUS_FILE} not found!")
 
     with status_path.open("r", encoding="utf-8") as sf:
         status_data = json.load(sf)
@@ -150,7 +39,6 @@ def run():
     post_found = status_data.get("post_to_comment_found")
     comment_gen = status_data.get("comment_generated")
 
-    # Dono values true honi chahiye, nahi toh exit
     if not (post_found is True and comment_gen is True):
         print("Not Ready to Comment Yet!", flush=True)
         sys.exit(0)
@@ -162,38 +50,21 @@ def run():
         print("[ERROR] URL or Comment text missing in status.json despite flags being True.", flush=True)
         sys.exit(1)
 
-    # Cookies setup
-    cookies = load_cookies(Path(REDDIT_COOKIES_FILE))
+    cookies = load_cookies(REDDIT_COOKIES_FILE)
     print(f"[OK] Total cookies loaded: {len(cookies)}", flush=True)
 
-    # =========================
-    # STEALTH SETUP
-    # =========================
-    stealth = Stealth()
-    pw_cm = stealth.use_sync(sync_playwright())
-    pw = pw_cm.__enter__()
+    pw, pw_cm = browser.start_playwright()
+    browser_instance = None
+    page = None
 
-    browser = None
     try:
-        browser = pw.chromium.launch(
-            headless=HEADLESS,
-            args=[
-                "--start-maximized",
-                "--disable-blink-features=AutomationControlled"
-            ]
-        )
-
-        context = browser.new_context(
-            no_viewport=True,
-            user_agent=USER_AGENT
-        )
-
-        context.grant_permissions(["clipboard-read", "clipboard-write"])
-        print("[STEP] Adding cookies to browser context...", flush=True)
+        browser_instance = browser.launch_browser(pw)
+        context = browser.new_context(browser_instance)
         context.add_cookies(cookies)
-
         page = context.new_page()
         print("[OK] Cookies added successfully", flush=True)
+
+        book = LocatorBook("reddit_locators", page)
 
         # ========================================================
         # DIRECT NAVIGATION TO TARGET URL
@@ -201,13 +72,12 @@ def run():
         print(f"[STEP] Navigating directly to post URL: {target_url}...", flush=True)
         page.goto(target_url, wait_until="domcontentloaded")
         print(f"[OK] {target_url} opened completely", flush=True)
-        
-        # Post load hone ka wait
-        custom_random_wait(5, 10)
+
+        browser.wait("medium")
 
         # URL extraction & duplicate handling
         full_url = page.url
-        clean_url_match = re.match(r'(https://www\.reddit\.com/r/[^/]+/comments/[^/]+/)', full_url)
+        clean_url_match = re.match(r"(https://www\.reddit\.com/r/[^/]+/comments/[^/]+/)", full_url)
         clean_post_url = clean_url_match.group(1) if clean_url_match else full_url
 
         json_path = Path(COMMENTED_JSON_FILE)
@@ -223,69 +93,51 @@ def run():
 
         if clean_post_url in existing_urls:
             print(f"[CLEAN EXIT] URL already commented in history: {clean_post_url}. Resetting status and exiting.", flush=True)
-            
-            # 1. status.json को रीसेट करें
-            status_data["post_to_comment_found"] = False
-            status_data["comment_generated"] = False
-            status_data["link_to_post_to_comment"] = ""
-            status_data["content_of_post_to_comment"] = ""
-            status_data["comment"] = ""
-            with status_path.open("w", encoding="utf-8") as sf:
-                json.dump(status_data, sf, indent=4)
-                
-            # 2. सिर्फ ब्राउज़र बंद करें, बाकी काम नीचे वाला finally ब्लॉक अपने आप संभाल लेगा
-            browser.close()
+            _reset_status(status_data, status_path)
+            if browser_instance:
+                browser_instance.close()
             sys.exit(0)
 
         # =========================
-        # COMMENT AUTOMATION (PLAYWRIGHT)
+        # COMMENT AUTOMATION
         # =========================
-        # 1. Click 'Go to comments' button agar available ho
+        # 1. Click 'Go to comments' button if available
         print("[STEP] Locating and clicking 'Go to comments' button...", flush=True)
-        go_to_comments_btn = page.get_by_role('button', name='Go to comments')
-        if go_to_comments_btn.count() > 0:
-            go_to_comments_btn.click()
-            custom_random_wait(5, 10)
+        if book.is_visible("go_to_comments_btn", purpose="the 'Go to comments' button on a post page"):
+            book.click("go_to_comments_btn", purpose="the 'Go to comments' button on a post page")
+            browser.wait("medium")
 
         # 2. Locate empty comment input box
         print("[STEP] Locating comment input field...", flush=True)
-        rich_text_editor = page.locator('[data-testid="comment-composer-richtext"], [contenteditable="true"]').first
-        rich_text_editor.wait_for(state="visible", timeout=15000)
-        rich_text_editor.click()
-        custom_random_wait(5, 10)
+        book.click(
+            "comment_composer",
+            purpose="the rich-text comment composer box on a Reddit post",
+        )
+        browser.wait("medium")
 
         # 3. Type comment like a human
         print("[STEP] Typing comment from status.json via native keyboard emulation...", flush=True)
-        for char in comment_to_post:
-            page.keyboard.type(char)
-            time.sleep(random.uniform(0.04, 0.09))
-            
-        custom_random_wait(5, 10)
+        browser.human_type(page, comment_to_post)
 
-        # 4. Click 'Comment' Submit button
+        browser.wait("medium")
+
+        # 4. Click 'Comment' submit button
         print("[STEP] Clicking 'Comment' submit button...", flush=True)
-        submit_btn = page.get_by_role('button', name='Comment', exact=True)
-        submit_btn.click()
+        book.click("submit_comment_btn", purpose="the 'Comment' submit button")
         print("[OK] Comment posted successfully!", flush=True)
-        custom_random_wait(5, 10)
+        browser.wait("medium")
 
         # =========================
         # UPVOTE AUTOMATION
         # =========================
         print("[STEP] Attempting to upvote the post...", flush=True)
-        upvote_btn_testid = page.get_by_test_id('action-row').get_by_role('button', name='Upvote').first
-        upvote_btn_aria = page.get_by_role('button', name='Upvote').first
-
-        if upvote_btn_testid.count() > 0 and upvote_btn_testid.is_visible():
-            upvote_btn_testid.click()
-            print("[OK] Post Upvoted via TestID locator!", flush=True)
-        elif upvote_btn_aria.count() > 0 and upvote_btn_aria.is_visible():
-            upvote_btn_aria.click()
-            print("[OK] Post Upvoted via Aria locator!", flush=True)
+        if book.is_visible("upvote_button", purpose="the Upvote button on a Reddit post"):
+            book.click("upvote_button", purpose="the Upvote button on a Reddit post")
+            print("[OK] Post Upvoted!", flush=True)
         else:
             print("[WARNING] Upvote button could not be located or click state is blocked.", flush=True)
-            
-        custom_random_wait(5, 10)
+
+        browser.wait("medium")
 
         # History update
         if clean_post_url not in existing_urls:
@@ -297,44 +149,28 @@ def run():
         # ========================================================
         # RESET STATUS JSON ON SUCCESSFUL RUN
         # ========================================================
-        print(f"[STEP] Resetting workflow keys in {STATUS_JSON_FILE}...", flush=True)
-        status_data["post_to_comment_found"] = False
-        status_data["comment_generated"] = False
-        status_data["link_to_post_to_comment"] = ""
-        status_data["content_of_post_to_comment"] = ""
-        status_data["comment"] = ""
-        
-        with status_path.open("w", encoding="utf-8") as sf:
-            json.dump(status_data, sf, indent=4)
+        print(f"[STEP] Resetting workflow keys in {STATUS_FILE}...", flush=True)
+        _reset_status(status_data, status_path)
         print("[OK] status.json reset process complete.", flush=True)
 
-        # Final close delay buffer (15 to 30 seconds as requested)
-        custom_random_wait(15, 30)
+        browser.wait("final")
 
     except SystemExit:
         raise
     except Exception as e:
         print("[ERROR] Automation cycle interrupted due to runtime trace:", e, flush=True)
-        if 'page' in locals() and page:
-            try:
-                screenshot_path = "error_screenshot.png"
-                page.screenshot(path=screenshot_path, full_page=True)
-                print(f"[OK] Error screenshot captured: {screenshot_path}", flush=True)
-                
-                upload_to_onlyfiles(screenshot_path)
-            except Exception as screenshot_err:
-                print(f"[WARNING] Could not capture or upload screenshot: {screenshot_err}", flush=True)
+        browser.report_error(page)
         sys.exit(1)
 
     finally:
-        if browser:
+        if browser_instance:
             try:
-                browser.close()
-            except:
+                browser_instance.close()
+            except Exception:
                 pass
         try:
             pw_cm.__exit__(None, None, None)
-        except:
+        except Exception:
             pass
 
         print("[DONE] Script execution phase closed. Terminating process context cleanly.", flush=True)

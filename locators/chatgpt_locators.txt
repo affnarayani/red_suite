@@ -1,0 +1,27 @@
+# =============================================================================
+# ChatGPT locators
+# Used by: generate_content.py, generate_comment.py
+#
+# Format:  variable_name = <playwright expression> :: primary|fallback
+# - The first line for a variable is the PRIMARY locator.
+# - Following lines with the same name are FALLBACKS (tried in order).
+# - Resolution order: primary -> fallbacks -> Gemini vision.
+# - The ":: primary|fallback" marker is optional and only for readability.
+# =============================================================================
+
+# --- Login / account state ---------------------------------------------------
+# Profile button that confirms a successful login (matches "Free, open ..." or menu).
+profile_button = page.get_by_role('button', name=re.compile(r'.*Free, open')).or_(page.get_by_role('button', name='Open profile menu')) :: primary
+
+# --- Prompt input ------------------------------------------------------------
+# Main chat message textbox (several historical labels/selectors as fallbacks).
+chatgpt_textbox = page.get_by_role('textbox', name='Chat with ChatGPT').or_(page.get_by_role('textbox', name='Ask ChatGPT')) :: primary
+chatgpt_textbox = page.locator('div[contenteditable="true"]').filter(has=page.locator('p', has_text='Ask anything')).first :: fallback
+chatgpt_textbox = page.locator('#prompt-textarea') :: fallback
+
+# Send button for the prompt.
+send_button = page.get_by_test_id('send-button').or_(page.get_by_role('button', name='Send')) :: primary
+
+# --- Response / code block ---------------------------------------------------
+# Generated code block that holds the JSON response.
+code_block = page.locator('#code-block-viewer pre').or_(page.get_by_role('textbox', name='Edit code')).or_(page.get_by_role('code')) :: primary

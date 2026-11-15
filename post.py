@@ -1,165 +1,38 @@
-import os
-import sys
 import json
-import time
-import base64
-import random
-import re
-import requests
+import sys
 from pathlib import Path
-from typing import List, Dict, Any
 
 from dotenv import load_dotenv
 
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.exceptions import InvalidTag
-
-from playwright.sync_api import sync_playwright
-from playwright_stealth import Stealth
-
-
-# =========================
-# CONFIG
-# =========================
-HEADLESS = True
-
-REDDIT_COOKIES_FILE = "reddit_cookies.json.encrypted"
-STATUS_JSON_FILE = "status.json"
-REDDIT_POST_FILE = "reddit_post.json"
-POSTED_JSON_FILE = "posted.json"
-
-PBKDF2_ITERATIONS = 200_000
-
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+from common import browser
+from common.crypto import load_cookies
+from common.locators import LocatorBook, apply_auto_correct
+from common.paths import (
+    POSTED_FILE,
+    REDDIT_COOKIES_FILE,
+    REDDIT_POST_FILE,
+    STATUS_FILE,
+)
 
 
-# =========================
-# ENV
-# =========================
-load_dotenv()
-
-DECRYPT_KEY = os.getenv("DECRYPT_KEY")
-
-if not DECRYPT_KEY:
-    raise RuntimeError("DECRYPT_KEY missing")
+def _clean_subreddit(subreddit_name):
+    if subreddit_name.startswith("r/"):
+        return subreddit_name[2:]
+    if subreddit_name.startswith("/r/"):
+        return subreddit_name[3:]
+    return subreddit_name
 
 
-# =========================
-# RANDOM WAIT
-# =========================
-def custom_random_wait(min_sec=15, max_sec=30):
-    seconds = random.uniform(min_sec, max_sec)
-    print(f"[WAIT] Sleeping for {seconds:.2f} seconds...", flush=True)
-    time.sleep(seconds)
-
-
-# =========================
-# CRYPTO
-# =========================
-def _derive_key(password: bytes, salt: bytes) -> bytes:
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=PBKDF2_ITERATIONS,
-    )
-    return kdf.derive(password)
-
-
-def _decrypt_payload(payload: Dict[str, Any], password: str) -> bytes:
-    salt = base64.b64decode(payload["s"])
-    nonce = base64.b64decode(payload["n"])
-    ciphertext = base64.b64decode(payload["ct"])
-
-    key = _derive_key(password.encode("utf-8"), salt)
-    aesgcm = AESGCM(key)
-
-    try:
-        return aesgcm.decrypt(nonce, ciphertext, None)
-    except InvalidTag:
-        raise RuntimeError("❌ Decryption failed (InvalidTag)")
-
-
-def load_cookies(file_path: Path) -> List[Dict[str, Any]]:
-    print("[STEP] Loading cookies...", flush=True)
-
-    with file_path.open("r", encoding="utf-8") as f:
-        payload = json.load(f)
-
-    plaintext = _decrypt_payload(payload, DECRYPT_KEY)
-    cookies = json.loads(plaintext.decode("utf-8"))
-
-    for c in cookies:
-        if "partitionKey" in c and isinstance(c["partitionKey"], dict):
-            if "topLevelSite" in c["partitionKey"]:
-                c["partitionKey"] = str(c["partitionKey"]["topLevelSite"])
-            else:
-                del c["partitionKey"]
-
-        if "sameSite" in c:
-            val = str(c["sameSite"]).lower()
-
-            if val in ["no_restriction", "none", "unspecified", "null"]:
-                c["sameSite"] = "None"
-            elif val == "lax":
-                c["sameSite"] = "Lax"
-            elif val == "strict":
-                c["sameSite"] = "Strict"
-            else:
-                c["sameSite"] = "Lax"
-
-    print("[OK] Cookies loaded", flush=True)
-    return cookies
-
-
-# =========================
-# HUMAN TYPING SIMULATOR
-# =========================
-def human_type(page, text_to_type: str):
-    """
-    Simulates human typing character by character.
-    Converts multiple consecutive newlines (\n\n, \n\n\n, etc.) into a single \n.
-    """
-    cleaned_text = re.sub(r'\n+', '\n', text_to_type)
-    
-    for char in cleaned_text:
-        if char == '\n':
-            page.keyboard.press("Enter")
-        else:
-            page.keyboard.type(char)
-        time.sleep(random.uniform(0.04, 0.09)) # Human stroke delays
-
-def upload_to_onlyfiles(screenshot_path):
-    url = "https://api.onlyfiles.com/v1/upload"
-
-    with open(screenshot_path, "rb") as file:
-        # expire = 172800 seconds (48 hours) tak file upload rahegi
-        response = requests.post(url, files={"file": file}, data={"expire": 172800})
-
-    if response.status_code == 200:
-        res_data = response.json()
-        if res_data.get("status"):
-            direct_url = res_data["data"]["file"]["url"]["full"]
-            print(f"👉 DIRECT LINK (Expires in 48 Hours): {direct_url}")
-            return direct_url
-        print(f"[WARNING] Upload Failed: {res_data.get('error', {}).get('message', 'Unknown error')}")
-        return None
-    else:
-        print(f"[WARNING] Upload Failed: {response.status_code}")
-        return None
-
-# =========================
-# MAIN
-# =========================
 def run():
     print("[START] Script started", flush=True)
 
+    # Apply any pending locator auto-corrections before running.
+    apply_auto_correct()
+
     # 1. Check status.json first
-    status_path = Path(STATUS_JSON_FILE)
+    status_path = Path(STATUS_FILE)
     if not status_path.exists():
-        print(f"❌ {STATUS_JSON_FILE} not found. Please create it first.", flush=True)
+        print(f"[ERROR] {STATUS_FILE} not found. Please create it first.", flush=True)
         sys.exit(1)
 
     with status_path.open("r", encoding="utf-8") as sf:
@@ -174,7 +47,7 @@ def run():
     # 2. Read reddit_post.json data
     post_path = Path(REDDIT_POST_FILE)
     if not post_path.exists():
-        print(f"❌ Configured file {REDDIT_POST_FILE} not found!", flush=True)
+        print(f"[ERROR] Configured file {REDDIT_POST_FILE} not found!", flush=True)
         sys.exit(1)
 
     with post_path.open("r", encoding="utf-8") as pf:
@@ -185,160 +58,139 @@ def run():
     post_body = post_data.get("body", "").strip()
 
     if not subreddit_name or not post_title or not post_body:
-        print("❌ Subreddit, title, or body missing in reddit_post.json!", flush=True)
+        print("[ERROR] Subreddit, title, or body missing in reddit_post.json!", flush=True)
         sys.exit(1)
 
-    # Clean subreddit format
-    if subreddit_name.startswith("r/"):
-        cleaned_sub_name = subreddit_name[2:]
-    elif subreddit_name.startswith("/r/"):
-        cleaned_sub_name = subreddit_name[3:]
-    else:
-        cleaned_sub_name = subreddit_name
+    target_subreddit_url = f"https://www.reddit.com/r/{_clean_subreddit(subreddit_name)}/"
 
-    target_subreddit_url = f"https://www.reddit.com/r/{cleaned_sub_name}/"
-
-    # Load Cookies
-    cookies = load_cookies(Path(REDDIT_COOKIES_FILE))
+    # Load cookies
+    cookies = load_cookies(REDDIT_COOKIES_FILE)
     print(f"[OK] Total cookies loaded: {len(cookies)}", flush=True)
 
-    # Playwright Stealth Setup
-    stealth = Stealth()
-    pw_cm = stealth.use_sync(sync_playwright())
-    pw = pw_cm.__enter__()
-
+    # Playwright stealth setup
+    pw, pw_cm = browser.start_playwright()
+    browser_instance = None
+    page = None
     program_success = False
 
     try:
-        browser = pw.chromium.launch(
-            headless=HEADLESS,
-            args=[
-                "--start-maximized",
-                "--disable-blink-features=AutomationControlled"
-            ]
-        )
-
-        context = browser.new_context(
-            no_viewport=True,
-            user_agent=USER_AGENT
-        )
-
-        context.grant_permissions(["clipboard-read", "clipboard-write"])
-        print("[STEP] Adding cookies to browser context...", flush=True)
+        browser_instance = browser.launch_browser(pw)
+        context = browser.new_context(browser_instance)
         context.add_cookies(cookies)
-
         page = context.new_page()
         print("[OK] Cookies added successfully", flush=True)
 
-        # Step 1: Open Target Subreddit directly after login
+        book = LocatorBook("reddit_locators", page)
+
+        # Step 1: Open target subreddit directly after login
         print(f"[STEP] Navigating to subreddit URL: {target_subreddit_url}...", flush=True)
         page.goto(target_subreddit_url, wait_until="domcontentloaded")
         print(f"[OK] {target_subreddit_url} opened completely.", flush=True)
 
-        # Step 2: Wait 15-30s and click 'Create Post'
-        custom_random_wait(15, 30)
+        # Step 2: Wait and click 'Create Post'
+        browser.wait("absolute")
         print("[STEP] Clicking 'Create Post' button...", flush=True)
-        create_post_btn = page.get_by_test_id('create-post')
-        create_post_btn.wait_for(state="visible", timeout=20000)
-        create_post_btn.click()
+        book.click("create_post_btn", purpose="the 'Create Post' button on a Reddit subreddit page")
 
-        # Step 3: Wait 15-30s and focus/type Title
-        custom_random_wait(15, 30)
+        # Step 3: Wait and type the title
+        browser.wait("absolute")
         print("[STEP] Focusing Title field and typing title...", flush=True)
-        title_box = page.get_by_role('textbox', name='Title')
-        title_box.wait_for(state="visible", timeout=20000)
-        title_box.click()
-        human_type(page, f"[Story] {post_title}")
+        book.type_human(
+            "post_title_box",
+            f"[Story] {post_title}",
+            purpose="the post Title textbox on the create post form",
+        )
 
         # ====================================================
         # CONDITIONAL FLAIR SELECTION WITH KEYBOARD SEQUENCES
         # ====================================================
         print("[STEP] Checking if flair button is available on page...", flush=True)
-        flair_btn = page.get_by_role('button', name='Add flair and tags *')
-        
-        if flair_btn.is_visible():
+        flair_present = book.is_visible(
+            "flair_and_tags_btn",
+            purpose="the 'Add flair and tags' button (only present when a flair is required)",
+        )
+
+        if flair_present:
             print("[INFO] Mandatory flair button found. Initiating interaction sequence...", flush=True)
-            flair_btn.click()
-            custom_random_wait(3, 6)
+            book.click(
+                "flair_and_tags_btn",
+                purpose="the 'Add flair and tags' button",
+            )
+            browser.wait("short")
 
             for i in range(1, 4):
                 print(f"[STEP] Sending TAB key ({i}/3)...", flush=True)
                 page.keyboard.press("Tab")
-                custom_random_wait(3, 6)
+                browser.wait("short")
 
             print("[STEP] Sending SPACE key...", flush=True)
             page.keyboard.press("Space")
-            custom_random_wait(3, 6)
+            browser.wait("short")
 
             print("[STEP] Clicking 'Add' button to submit flair...", flush=True)
-            add_btn = page.get_by_role('button', name='Add', exact=True)
-            add_btn.wait_for(state="visible", timeout=20000)
-            add_btn.click()
-            custom_random_wait(3, 6)
+            book.click(
+                "flair_add_btn",
+                purpose="the 'Add' button that submits the selected flair",
+            )
+            browser.wait("short")
             print("[OK] Flair interaction sequence completed successfully.", flush=True)
         else:
             print("[INFO] Flair button not found or not visible. Skipping flair selection safely...", flush=True)
         # ====================================================
 
-        # Step 4: Wait 15-30s and focus/type Post Body text field
-        custom_random_wait(15, 30)
+        # Step 4: Wait and type the post body
+        browser.wait("absolute")
         print("[STEP] Focusing Post body field and typing body paragraphs...", flush=True)
-        body_box = page.get_by_role('textbox', name='Post body text field')
-        body_box.wait_for(state="visible", timeout=20000)
-        body_box.click()
-        human_type(page, post_body)
+        book.type_human(
+            "post_body_box",
+            post_body,
+            purpose="the main post body text editor on the create post form",
+        )
 
-        # Step 5: Wait 15-30s and click 'Post' button
-        custom_random_wait(15, 30)
+        # Step 5: Wait and click 'Post'
+        browser.wait("absolute")
         print("[STEP] Clicking 'Post' submit button...", flush=True)
-        post_btn = page.get_by_role('button', name='Post', exact=True)
-        post_btn.wait_for(state="visible", timeout=20000)
-        post_btn.click()
+        book.click(
+            "submit_post_btn",
+            purpose="the final 'Post' submit button",
+        )
         print("[OK] Post submitted successfully!", flush=True)
 
         # Step 6: Final wait before closing browser
-        custom_random_wait(15, 30)
+        browser.wait("absolute")
         program_success = True
 
     except SystemExit:
         raise
     except Exception as e:
         print("[ERROR] Automation workflow failed:", e, flush=True)
-        if 'page' in locals() and page:
+        browser.report_error(page)
+        if browser_instance:
             try:
-                screenshot_path = "error_screenshot.png"
-                page.screenshot(path=screenshot_path, full_page=True)
-                print(f"[OK] Error screenshot captured: {screenshot_path}", flush=True)
-                
-                upload_to_onlyfiles(screenshot_path)
-            except Exception as screenshot_err:
-                print(f"[WARNING] Could not capture or upload screenshot: {screenshot_err}", flush=True)
-        if browser:
-            try:
-                browser.close()
-            except:
+                browser_instance.close()
+            except Exception:
                 pass
         sys.exit(1)
 
     finally:
         try:
-            browser.close()
+            if browser_instance:
+                browser_instance.close()
             print("[INFO] Browser context closed.", flush=True)
-        except:
+        except Exception:
             pass
 
         try:
             pw_cm.__exit__(None, None, None)
-        except:
+        except Exception:
             pass
 
-        # 3. Post successfully submit hone par status aur history update karna
+        # Update status/history only when the post was actually submitted.
         if program_success:
-            # 3a. Update posted.json at the top
-            print(f"[STEP] Appending new topic to the top of {POSTED_JSON_FILE}...", flush=True)
-            posted_path = Path(POSTED_JSON_FILE)
+            print(f"[STEP] Appending new topic to the top of {POSTED_FILE}...", flush=True)
+            posted_path = Path(POSTED_FILE)
             existing_history = []
-            
+
             if posted_path.exists():
                 try:
                     with posted_path.open("r", encoding="utf-8") as hf:
@@ -347,21 +199,19 @@ def run():
                             existing_history = []
                 except Exception:
                     existing_history = []
-            
+
             new_entry = {
                 "topic": post_title,
-                "subreddit": subreddit_name
+                "subreddit": subreddit_name,
             }
-            
-            # List ke starting (index 0) me insert karne ke liye add kiya
+
             updated_history = [new_entry] + existing_history
-            
+
             with posted_path.open("w", encoding="utf-8") as hf:
                 json.dump(updated_history, hf, indent=4, ensure_ascii=False)
-            print(f"[OK] {POSTED_JSON_FILE} successfully updated (New entry added on top).", flush=True)
+            print(f"[OK] {POSTED_FILE} successfully updated (New entry added on top).", flush=True)
 
-            # 3b. Reset content_generated to false in status.json
-            print(f"[STEP] Resetting content_generated to false in {STATUS_JSON_FILE}...", flush=True)
+            print(f"[STEP] Resetting content_generated to false in {STATUS_FILE}...", flush=True)
             status_data["content_generated"] = False
             with status_path.open("w", encoding="utf-8") as sf:
                 json.dump(status_data, sf, indent=4)

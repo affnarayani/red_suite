@@ -1,6 +1,6 @@
 playwright
-requests
-huggingface-hub
+playwright-stealth
 python-dotenv
 cryptography
-playwright-stealth
+requests
+google-genai

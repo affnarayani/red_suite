@@ -1,0 +1,28 @@
+{
+    "headless": false,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "pbkdf2_iterations": 200000,
+    "vision_enabled": true,
+    "gemini_model": "gemini-3.5-flash-lite",
+    "auto_correct_locator": false,
+    "locator_check_timeout_ms": 1500,
+    "onlyfiles": {
+        "upload_url": "https://api.onlyfiles.com/v1/upload",
+        "expire_seconds": 172800
+    },
+    "scraper": {
+        "search_url": "https://www.reddit.com/search/?q=Motivation+%26+Self-Improvement&type=communities",
+        "target_subreddit_count": 5,
+        "min_weekly_users": 5000,
+        "min_weekly_contributions": 1000
+    },
+    "waits": {
+        "absolute": {"min": 15, "max": 30},
+        "short": {"min": 3, "max": 6},
+        "medium": {"min": 5, "max": 10},
+        "random": {"min": 30, "max": 60},
+        "final": {"min": 15, "max": 30},
+        "cooldown": {"min": 10, "max": 15},
+        "human_type": {"min": 0.04, "max": 0.09}
+    }
+}

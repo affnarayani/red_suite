@@ -1,31 +1,27 @@
 name: 1B. Post
 
 on:
-  workflow_dispatch: # Manual trigger ke liye
-  workflow_run:
-    workflows: ["1A. Generate Content"] # Jab 'Generate Image' workflow khatam hoga tab trigger hoga
-    types:
-      - completed
+  schedule:
+    - cron: '30 0,7,14,21 * * *' # Har 7 ghante mein ek baar automatically chalega
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  
-jobs:
-  run-script:
-    runs-on: ubuntu-latest
-    # Sirf tabhi chalega jab manual ho YA pichla workflow successfully khatam hua ho
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
-    # CRITICAL FIX: GitHub Actions ko push karne ki permission dena
+jobs:
+  post-automation:
+    runs-on: ubuntu-latest
+
+    # CRITICAL: Repo mein files modify karke push karne ki permission dena
     permissions:
       contents: write
 
     steps:
       # 1. Repository code checkout karna
-      - name: Checkout repository code
+      - name: Checkout Repository Code
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0 # Full history fetch karega safe sync ke liye
+          fetch-depth: 0 # Full history fetch karega safe persistent push ke liye
 
       # 2. Python Environment setup karna
       - name: Set up Python
@@ -34,16 +30,15 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      # 3. Git Author Identity configure karna (Sirf ek baar kaafi hai)
+      # 3. Git Author Identity configure karna
       - name: Configure Git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      # 4. Pull Latest Changes (Kyunki pichle workflow ne shayad kuch change kiya ho)
-      - name: Pull Latest Changes (Maintain Persistence)
+      # 4. Pull Latest Changes (Taaki up-to-date code/files par run ho)
+      - name: Pull Latest Changes
         run: |
-          # Safe fallback agar GITHUB_REF_NAME empty ho (workflow_run ke cases mein)
           BRANCH_NAME="${GITHUB_REF_NAME:-main}"
           git pull origin "$BRANCH_NAME" --rebase
 
@@ -52,70 +47,67 @@ jobs:
           # 1. Repository aur GPG Key set karein
           curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
-          
+
           # 2. Install
           sudo apt-get update && sudo apt-get install -y cloudflare-warp
-          
+
           # 3. Start Service
           sudo systemctl start warp-svc
           sleep 2
-          
+
           # 4. Register (New CLI Syntax compatible)
           warp-cli --accept-tos registration new || warp-cli registration new
-          
+
           # 5. STRICT FIX: Mode ko PROXY se badal kar TUN (Standard VPN) karein
           # Yeh pure GitHub runner ka internet traffic WARP se routing kar dega
           warp-cli --accept-tos mode warp || warp-cli mode warp
-          
+
           # 6. Connect
           warp-cli --accept-tos connect || warp-cli connect
           sleep 5
-          
+
           # 7. Verify ki pure system ka IP change hua ya nahi
           curl https://cloudflare.com/cdn-cgi/trace
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright playwright-stealth python-dotenv cryptography requests
+          pip install -r requirements.txt
 
-      - name: Install Playwright Chromium and system dependencies
+      - name: Install Playwright and System Dependencies
         run: |
           playwright install chromium --with-deps
 
-      - name: Execute Automation Script
+      - name: Run Post Script
         env:
           DECRYPT_KEY: ${{ secrets.DECRYPT_KEY }}
-          IMGBBB_API_KEY: ${{ secrets.IMGBBB_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python post.py
 
-      # 8. Agar script fail hoti hai, toh error screenshot ko upload karna
-      - name: Upload Error Screenshot if script fails
-        if: failure()
+      - name: Upload Error Screenshot
+        if: failure() # Run only if python script crashes
         uses: actions/upload-artifact@v4
         with:
-          name: reddit-post-error-screenshot
-          path: error_screenshot.png
+          name: playwright-error-screenshot
+          path: error/error_screenshot.png
           if-no-files-found: ignore
-          retention-days: 7
 
-      # 9. Status aur Post data wapas commit karna
-      - name: Commit and Push updated files
-        if: always() # Hamesha check karein taaki agar partial state change ho toh save ho jaye
+      - name: Commit and Push Changes (If updated)
+        if: always() # Hamesha check karega taaki agar updates ho gaye ho toh save ho jaye
         run: |
           BRANCH_NAME="${GITHUB_REF_NAME:-main}"
-          
-          # Sirf tabhi add karein agar files exist karti hon
-          [ -f reddit_post.json ] && git add reddit_post.json
-          [ -f status.json ] && git add status.json
-          [ -f posted.json ] && git add posted.json
-          
+
+          [ -f json/posted.json ] && git add json/posted.json
+          [ -f json/status.json ] && git add json/status.json
+          [ -f json/reddit_post.json ] && git add json/reddit_post.json
+          [ -d locators ] && git add locators/
+
           if git diff --staged --quiet; then
-            echo "[INFO] No changes detected in status.json or reddit_post.json. Skipping push."
+            echo "[INFO] No changes detected. Skipping push."
           else
-            echo "[OK] Status changed. Committing and pushing updates..."
-            git commit -m "chore: mark article as posted [skip ci]"
-            git pull origin ${GITHUB_REF_NAME} --rebase
-          git push origin ${GITHUB_REF_NAME}
+            echo "[OK] Changes detected. Committing and pushing updates..."
+            git commit -m "Automated: Update story history and clear workflow status"
+            git pull origin "$BRANCH_NAME" --rebase
+            git push origin "$BRANCH_NAME"
           fi
