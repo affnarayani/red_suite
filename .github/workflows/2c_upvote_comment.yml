@@ -3,7 +3,7 @@ name: 2C. Upvote and Comment
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["2B. Generate Comment"] # Jab 'Generate Comment' workflow khatam hoga tab trigger hoga
+    workflows: ["2B. Generate Comment"] # When the 'Generate Comment' workflow completes, this will trigger
     types:
       - completed
 
@@ -19,8 +19,8 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      # 1. Fetch the latest code and state from the repository
-      # Full history fetch karna rebase conflicts se bachata hai
+# 1. Fetch the latest code and state from the repository
+          # Full history fetch prevents rebase conflicts
       - name: Checkout Repository
         uses: actions/checkout@v5
         with:
@@ -45,7 +45,7 @@ jobs:
 
       - name: Install and Start Cloudflare WARP (TUN Global Mode)
         run: |
-          # 1. Repository aur GPG Key set karein
+          # 1. Set up repository and GPG key
           curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
 
@@ -59,15 +59,15 @@ jobs:
           # 4. Register (New CLI Syntax compatible)
           warp-cli --accept-tos registration new || warp-cli registration new
 
-          # 5. STRICT FIX: Mode ko PROXY se badal kar TUN (Standard VPN) karein
-          # Yeh pure GitHub runner ka internet traffic WARP se routing kar dega
+          # 5. STRICT FIX: Change mode from PROXY to TUN (Standard VPN)
+          # This will route pure GitHub runner internet traffic through WARP
           warp-cli --accept-tos mode warp || warp-cli mode warp
 
           # 6. Connect
           warp-cli --accept-tos connect || warp-cli connect
           sleep 5
 
-          # 7. Verify ki pure system ka IP change hua ya nahi
+          # 7. Verify if the pure system IP has changed or not
           curl https://cloudflare.com/cdn-cgi/trace
 
       # 3. Install required packages from requirements.txt
@@ -91,20 +91,20 @@ jobs:
 
       # 6. Commit and Push Any Changes (Safe State Sync)
       - name: Commit and Push Any Changes
-        if: always() # Hamesha chalega taaki agar partial run bhi hua ho toh state save ho jaye
+        if: always() # Always run so that if a partial run occurred, state gets saved
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
           BRANCH_NAME="${GITHUB_REF_NAME:-main}"
 
-          # 1. Jo local changes python script ne kiye hain, unhe temporarily stash (hide) karo
+          # 1. Temporarily stash (hide) local changes made by the python script
           git stash
 
           # 2. Pull down remote updates safely without conflict
           git pull origin "$BRANCH_NAME" --rebase
 
-          # 3. Stashed changes ko wapas apply karo (agar koi change nahi tha toh error na aaye isliye || true)
+          # 3. Apply stashed changes back (|| true prevents error if there were no changes)
           git stash pop || true
 
           # Only stage the intended files
