@@ -100,24 +100,24 @@ jobs:
           retention-days: 7
 
       # 10. Commit and push updates to subreddits.txt and banned.txt
-- name: Commit and Push Cleaned Lists
-      if: always() # Always runs so that any partial updates that occurred get pushed
-      run: |
-        BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+      - name: Commit and Push Cleaned Lists
+        if: always() # Always runs so that any partial updates that occurred get pushed
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
 
-        # Pull latest remote state first, taking remote version on conflict
-        # This prevents rebase conflicts when multiple workflows edit the same files
-        git pull origin "$BRANCH_NAME" --strategy-option=theirs || true
+          # Pull latest remote state first, taking remote version on conflict
+          # This prevents rebase conflicts when multiple workflows edit the same files
+          git pull origin "$BRANCH_NAME" --strategy-option=theirs || true
 
-        # Only add files if they were created or modified
-        [ -f data/subreddits.txt ] && git add data/subreddits.txt
-        [ -f data/banned.txt ] && git add data/banned.txt
-        [ -d locators ] && git add locators/
+          # Only add files if they were created or modified
+          [ -f data/subreddits.txt ] && git add data/subreddits.txt
+          [ -f data/banned.txt ] && git add data/banned.txt
+          [ -d locators ] && git add locators/
 
-        if git diff --staged --quiet; then
-          echo "[INFO] No banned subreddits detected. Files are unchanged. Skipping push."
-        else
-          echo "[OK] Ban logs updated. Committing and pushing updates..."
-          git commit -m "chore: update subreddits list and banned history [skip ci]"
-          git push origin "$BRANCH_NAME"
-        fi
+          if git diff --staged --quiet; then
+            echo "[INFO] No banned subreddits detected. Files are unchanged. Skipping push."
+          else
+            echo "[OK] Ban logs updated. Committing and pushing updates..."
+            git commit -m "chore: update subreddits list and banned history [skip ci]"
+            git push origin "$BRANCH_NAME"
+          fi

@@ -103,24 +103,24 @@ jobs:
           retention-days: 7
 
       # 9. Push scraped new subreddits and banned logs to the repo
-- name: Commit and Push Scraped Data
-      if: always() # Always runs so that any partial targets found get saved
-      run: |
-        BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+      - name: Commit and Push Scraped Data
+        if: always() # Always runs so that any partial targets found get saved
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
 
-        # Pull latest remote state first, taking remote version on conflict
-        # This prevents rebase conflicts when multiple workflows edit the same files
-        git pull origin "$BRANCH_NAME" --strategy-option=theirs || true
+          # Pull latest remote state first, taking remote version on conflict
+          # This prevents rebase conflicts when multiple workflows edit the same files
+          git pull origin "$BRANCH_NAME" --strategy-option=theirs || true
 
-        # Only add files if they have changes
-        [ -f data/subreddits.txt ] && git add data/subreddits.txt
-        [ -f data/banned.txt ] && git add data/banned.txt
-        [ -d locators ] && git add locators/
+          # Only add files if they have changes
+          [ -f data/subreddits.txt ] && git add data/subreddits.txt
+          [ -f data/banned.txt ] && git add data/banned.txt
+          [ -d locators ] && git add locators/
 
-        if git diff --staged --quiet; then
-          echo "[INFO] No new subreddits scraped or banned logs updated. Skipping push."
-        else
-          echo "[OK] New data detected. Committing and pushing updates..."
-          git commit -m "chore: update scraped subreddits and tracking history [skip ci]"
-          git push origin "$BRANCH_NAME"
-        fi
+          if git diff --staged --quiet; then
+            echo "[INFO] No new subreddits scraped or banned logs updated. Skipping push."
+          else
+            echo "[OK] New data detected. Committing and pushing updates..."
+            git commit -m "chore: update scraped subreddits and tracking history [skip ci]"
+            git push origin "$BRANCH_NAME"
+          fi
