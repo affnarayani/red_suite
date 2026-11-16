@@ -94,7 +94,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Commit and Push Changes (If updated)
-        if: always() # Hamesha check karega taaki agar updates ho gaye ho toh save ho jaye
+        if: always() # Always check so that if updates occurred, they get saved
         run: |
           BRANCH_NAME="${GITHUB_REF_NAME:-main}"
 

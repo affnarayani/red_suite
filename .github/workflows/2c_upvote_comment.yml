@@ -19,8 +19,8 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-# 1. Fetch the latest code and state from the repository
-          # Full history fetch prevents rebase conflicts
+      # 1. Fetch the latest code and state from the repository
+      # Full history fetch prevents rebase conflicts
       - name: Checkout Repository
         uses: actions/checkout@v5
         with:

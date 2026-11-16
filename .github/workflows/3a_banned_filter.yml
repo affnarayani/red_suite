@@ -101,7 +101,7 @@ jobs:
 
       # 10. Commit and push updates to subreddits.txt and banned.txt
       - name: Commit and Push Cleaned Lists
-        if: always() # Hamesha run hoga taaki agar beech mein partial updates bhi hue hon toh push ho jaye
+        if: always() # Always runs so that any partial updates that occurred get pushed
         run: |
           BRANCH_NAME="${GITHUB_REF_NAME:-main}"
 
