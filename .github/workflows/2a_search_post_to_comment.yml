@@ -78,6 +78,10 @@ jobs:
     - name: Commit and Push Status Changes
       if: always() # Always check so that if an eligible post is found, it gets saved
       run: |
+        # Pull latest remote state first, taking remote version on conflict
+        # This prevents rebase conflicts when multiple workflows edit the same files
+        git pull origin ${GITHUB_REF_NAME} --strategy-option=theirs || true
+
         # Script only modifies or creates json/status.json
         [ -f json/status.json ] && git add json/status.json
         [ -d locators ] && git add locators/
@@ -87,6 +91,5 @@ jobs:
         else
           echo "[OK] Eligible post found and recorded. Committing status update..."
           git commit -m "Automated: Fresh target post extracted [skip ci]"
-          git pull origin ${GITHUB_REF_NAME} --rebase
           git push origin ${GITHUB_REF_NAME}
         fi

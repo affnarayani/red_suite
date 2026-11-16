@@ -93,21 +93,24 @@ jobs:
           path: error/error_screenshot.png
           if-no-files-found: ignore
 
-      - name: Commit and Push Changes (If updated)
-        if: always() # Always check so that if updates occurred, they get saved
-        run: |
-          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+- name: Commit and Push Changes (If updated)
+      if: always() # Always check so that if updates occurred, they get saved
+      run: |
+        BRANCH_NAME="${GITHUB_REF_NAME:-main}"
 
-          [ -f json/posted.json ] && git add json/posted.json
-          [ -f json/status.json ] && git add json/status.json
-          [ -f json/reddit_post.json ] && git add json/reddit_post.json
-          [ -d locators ] && git add locators/
+        # Pull latest remote state first, taking remote version on conflict
+        # This prevents rebase conflicts when multiple workflows edit the same files
+        git pull origin "$BRANCH_NAME" --strategy-option=theirs || true
 
-          if git diff --staged --quiet; then
-            echo "[INFO] No changes detected. Skipping push."
-          else
-            echo "[OK] Changes detected. Committing and pushing updates..."
-            git commit -m "Automated: Update story history and clear workflow status"
-            git pull origin "$BRANCH_NAME" --rebase
-            git push origin "$BRANCH_NAME"
-          fi
+        [ -f json/posted.json ] && git add json/posted.json
+        [ -f json/status.json ] && git add json/status.json
+        [ -f json/reddit_post.json ] && git add json/reddit_post.json
+        [ -d locators ] && git add locators/
+
+        if git diff --staged --quiet; then
+          echo "[INFO] No changes detected. Skipping push."
+        else
+          echo "[OK] Changes detected. Committing and pushing updates..."
+          git commit -m "Automated: Update story history and clear workflow status"
+          git push origin "$BRANCH_NAME"
+        fi

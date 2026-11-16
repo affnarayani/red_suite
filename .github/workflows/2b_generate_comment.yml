@@ -70,6 +70,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        playwright install chromium --with-deps
 
     - name: Run Script
       env:
@@ -89,6 +90,10 @@ jobs:
     - name: Commit and Push Changes (If updated)
       if: always() # Always check so that if status changes, it gets saved
       run: |
+        # Pull latest remote state first, taking remote version on conflict
+        # This prevents rebase conflicts when multiple workflows edit the same files
+        git pull origin ${GITHUB_REF_NAME} --strategy-option=theirs || true
+
         # generate_comment.py only updates json/status.json
         [ -f json/status.json ] && git add json/status.json
         [ -d locators ] && git add locators/
@@ -98,6 +103,5 @@ jobs:
         else
           echo "[OK] Changes detected. Committing and pushing updates..."
           git commit -m "Automated: Update comment generation status [skip ci]"
-          git pull origin ${GITHUB_REF_NAME} --rebase
           git push origin ${GITHUB_REF_NAME}
         fi

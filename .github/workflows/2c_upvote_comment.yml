@@ -98,14 +98,9 @@ jobs:
 
           BRANCH_NAME="${GITHUB_REF_NAME:-main}"
 
-          # 1. Temporarily stash (hide) local changes made by the python script
-          git stash
-
-          # 2. Pull down remote updates safely without conflict
-          git pull origin "$BRANCH_NAME" --rebase
-
-          # 3. Apply stashed changes back (|| true prevents error if there were no changes)
-          git stash pop || true
+          # Pull latest remote state first, taking remote version on conflict
+          # This prevents rebase conflicts when multiple workflows edit the same files
+          git pull origin "$BRANCH_NAME" --strategy-option=theirs || true
 
           # Only stage the intended files
           [ -f json/status.json ] && git add json/status.json
@@ -117,6 +112,5 @@ jobs:
             echo "No new changes to commit."
           else
             git commit -m "chore: update automation history state [skip ci]"
-            git pull origin "$BRANCH_NAME" --rebase
             git push origin "$BRANCH_NAME"
           fi

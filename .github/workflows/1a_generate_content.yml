@@ -90,20 +90,23 @@ jobs:
           python generate_content.py
 
       # 9. Commit and push updated article and status files
-      - name: Commit and Push Generated Content and Status
-        if: always()
-        run: |
-          BRANCH_NAME="${GITHUB_REF_NAME:-main}"
+- name: Commit and Push Generated Content and Status
+      if: always()
+      run: |
+        BRANCH_NAME="${GITHUB_REF_NAME:-main}"
 
-          [ -f json/reddit_post.json ] && git add json/reddit_post.json
-          [ -f json/status.json ] && git add json/status.json
-          [ -d locators ] && git add locators/
+        # Pull latest remote state first, taking remote version on conflict
+        # This prevents rebase conflicts when multiple workflows edit the same files
+        git pull origin "$BRANCH_NAME" --strategy-option=theirs || true
 
-          if git diff --staged --quiet; then
-            echo "[INFO] No new generated content found. Files are unchanged. Skipping push."
-          else
-            echo "[OK] New content generated. Committing and pushing article and status updates..."
-            git commit -m "chore: update generated article and status [skip ci]"
-            git pull origin "$BRANCH_NAME" --rebase
-            git push origin "$BRANCH_NAME"
-          fi
+        [ -f json/reddit_post.json ] && git add json/reddit_post.json
+        [ -f json/status.json ] && git add json/status.json
+        [ -d locators ] && git add locators/
+
+        if git diff --staged --quiet; then
+          echo "[INFO] No new generated content found. Files are unchanged. Skipping push."
+        else
+          echo "[OK] New content generated. Committing and pushing article and status updates..."
+          git commit -m "chore: update generated article and status [skip ci]"
+          git push origin "$BRANCH_NAME"
+        fi
