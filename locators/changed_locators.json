@@ -1,8 +1,1 @@
-[
-    {
-        "locator_file": "reddit_locators.txt",
-        "variable": "post_text_body",
-        "broke_locator": "post_text_body = page.locator(\"shreddit-post-text-body [slot='text-body']\").first",
-        "suggested_locator": "page.locator(\"div[data-testid=\\\"post-content\\\"]\")"
-    }
-]
+[]
